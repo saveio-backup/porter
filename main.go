@@ -6,7 +6,7 @@
 package main
 
 import (
-	oniProxy "github.com/oniio/oniProxy/proxy"
+	oniProxy "github.com/saveio/porter/proxy"
 )
 
 func main() {

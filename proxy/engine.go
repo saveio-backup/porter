@@ -11,12 +11,12 @@ import (
 	"sync"
 	"fmt"
 	"net/url"
-	"github.com/oniio/oniChain/common/log"
+	"github.com/saveio/themis/common/log"
 	"math/rand"
 	"time"
-	"github.com/oniio/oniProxy/internal/protobuf"
+	"github.com/saveio/porter/internal/protobuf"
 	"encoding/hex"
-	"github.com/oniio/oniProxy/types/opcode"
+	"github.com/saveio/porter/types/opcode"
 )
 
 const (
@@ -147,7 +147,7 @@ func (p *ProxyServer) serverAccept() error {
 
 		peerInfo, ok:=p.proxies.Load(peerID)
 		if !ok{
-			proxyIP = p.proxyListenAndAccept(peerID, message.DialAddress)
+			proxyIP = p.proxyListenAndAccept(peerID, message.DialAddress) //DialAddress应该是对方的公网IP, receiveUDPMessage的时候返回
 			sendUDPMessage(&protobuf.Proxy{ProxyAddress:proxyIP}, p.listener, message.DialAddress)
 		} else if peerInfo.(peer).addr != message.DialAddress {
 			p.proxies.Delete(peerID)

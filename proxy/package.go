@@ -6,13 +6,13 @@
 package proxy
 
 import (
-	"github.com/oniio/oniProxy/internal/protobuf"
+	"github.com/saveio/porter/internal/protobuf"
 	"encoding/binary"
 	"github.com/golang/protobuf/proto"
-	"github.com/oniio/oniChain/common/log"
+	"github.com/saveio/themis/common/log"
 	"net"
 	"fmt"
-	"github.com/oniio/oniProxy/types/opcode"
+	"github.com/saveio/porter/types/opcode"
 )
 
 func receiveUDPRawMessage(conn *net.UDPConn) []byte {
