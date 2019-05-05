@@ -141,7 +141,7 @@ func (p *ProxyServer) serverAccept() error {
 		if nil==message {
 			continue
 		}
-		if message.Opcode != uint32(opcode.ProxyCode) {
+		if message.Opcode != uint32(opcode.ProxyRequestCode) {
 			continue
 		}
 

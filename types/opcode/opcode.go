@@ -8,5 +8,6 @@ package opcode
 type Opcode uint32
 
 const (
-	ProxyCode         	   Opcode = 0x0000f // 15
+	ProxyRequestCode         	   Opcode = 0x0000f // 15
+	ProxyResponseCode         	   Opcode = 0x00009 // 9
 )

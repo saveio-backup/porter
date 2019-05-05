@@ -13,6 +13,7 @@ import (
 	"net"
 	"fmt"
 	"github.com/saveio/porter/types/opcode"
+	"github.com/saveio/porter/common"
 )
 
 func receiveUDPRawMessage(conn *net.UDPConn) []byte {
@@ -48,10 +49,10 @@ func prepareMessage(message proto.Message) ([]byte) {
 		log.Error("in prepareMessage, (first) Marshal Message, ERROR:", err.Error())
 	}
 	msg := &protobuf.Message{
-		Opcode: 	uint32(opcode.ProxyCode),
+		Opcode: 	uint32(opcode.ProxyResponseCode),
 		IsProxy:	true,
 		Message: 	bytes,
-		Sender: 	&protobuf.ID{Address:"udp://127.0.0.1:6008",},
+		Sender: 	&protobuf.ID{Address:fmt.Sprintf("udp://%s:6008", common.GetLocalIP()),},
 	}
 	raw, err :=proto.Marshal(msg)
 	if err != nil {
