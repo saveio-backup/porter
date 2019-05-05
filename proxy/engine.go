@@ -17,6 +17,7 @@ import (
 	"github.com/saveio/porter/internal/protobuf"
 	"encoding/hex"
 	"github.com/saveio/porter/types/opcode"
+	"github.com/saveio/porter/common"
 )
 
 const (
@@ -105,12 +106,14 @@ func(p *ProxyServer) serverListenAndAccept(ip string, port uint16)  {
 	p.listener,err = listen(ip, port)
 	if err!=nil{
 		log.Errorf("server listen start ERROR:", err.Error())
+	}else{
+		log.Info("Proxy Listen IP:",ip,", Port:",port)
 	}
 	p.serverAccept()
 }
 
 func (p *ProxyServer)proxyListenAndAccept(peerID string, remoteAddr string) string {
-	listener, err:=listen("127.0.0.1", uint16(rand.Intn(10000)+55635))
+	listener, err:=listen(common.GetLocalIP(), uint16(rand.Intn(10000)+55635))
 	if err!=nil{
 		log.Error("proxy listen server start ERROR:", err.Error())
 		return ""
@@ -148,16 +151,16 @@ func (p *ProxyServer) serverAccept() error {
 		peerInfo, ok:=p.proxies.Load(peerID)
 		if !ok{
 			proxyIP = p.proxyListenAndAccept(peerID, message.DialAddress) //DialAddress应该是对方的公网IP, receiveUDPMessage的时候返回
-			sendUDPMessage(&protobuf.Proxy{ProxyAddress:proxyIP}, p.listener, message.DialAddress)
+			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, message.DialAddress)
 		} else if peerInfo.(peer).addr != message.DialAddress {
 			p.proxies.Delete(peerID)
 			proxyIP = p.proxyListenAndAccept(peerID, message.DialAddress)
-			sendUDPMessage(&protobuf.Proxy{ProxyAddress:proxyIP}, p.listener, message.DialAddress)
+			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, message.DialAddress)
 		}
 	}
 	return nil
 }
 
 func(p *ProxyServer) StartServer() {
-	p.serverListenAndAccept("127.0.0.1",6008)
+	p.serverListenAndAccept(common.GetLocalIP(),6008)
 }
