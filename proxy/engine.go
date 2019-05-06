@@ -163,9 +163,9 @@ func (p *ProxyServer) serverAccept() error {
 		if !ok{
 			proxyIP = p.proxyListenAndAccept(peerID, remoteAddr) //DialAddress应该是对方的公网IP, receiveUDPMessage的时候返回
 			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, remoteAddr)
-		} else if peerInfo.(peer).addr != message.DialAddress {
+		} else if peerInfo.(peer).addr != remoteAddr {
 			p.proxies.Delete(peerID)
-			proxyIP = p.proxyListenAndAccept(peerID, message.DialAddress)
+			proxyIP = p.proxyListenAndAccept(peerID, remoteAddr)
 			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, remoteAddr)
 		}
 	}
