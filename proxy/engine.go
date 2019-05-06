@@ -118,7 +118,7 @@ func (p *ProxyServer)proxyListenAndAccept(peerID string, remoteAddr string) stri
 		log.Error("proxy listen server start ERROR:", err.Error())
 		return ""
 	}
-	fmt.Println("proxy-listen:", listener.LocalAddr().String())
+	log.Info("proxy-listen:", listener.LocalAddr().String())
 	p.proxies.Store(peerID, peer{addr:remoteAddr, conn:listener})
 	go p.proxyAccept(listener, remoteAddr)
 	return listener.LocalAddr().String()
@@ -130,18 +130,29 @@ func (p *ProxyServer) proxyAccept(conn *net.UDPConn, remoteAddr string) error {
 		if nil==message{
 			continue
 		}
-		transferUDPRawMessage(message, conn, remoteAddr)
+		transferUDPRawMessage(message, p.listener, remoteAddr)
 	}
 	return nil
 }
 
 func (p *ProxyServer) serverAccept() error {
 	for {
-		message := receiveUDPMessage(p.listener)
+		message, remoteAddr := receiveUDPProxyMessage(p.listener)
 		if nil==message {
 			continue
 		}
 		if message.Opcode != uint32(opcode.ProxyRequestCode) {
+			continue
+		}
+
+		//if the client is working in public-net environment, return ip address directly
+		if message.Sender.Address == remoteAddr{
+			addrInfo, err:=ParseAddress(remoteAddr)
+			if err!=nil{
+				log.Error("parse remoteAddr err:", err.Error())
+				continue
+			}
+			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:addrInfo.toString()}, p.listener, remoteAddr)
 			continue
 		}
 
@@ -150,12 +161,12 @@ func (p *ProxyServer) serverAccept() error {
 
 		peerInfo, ok:=p.proxies.Load(peerID)
 		if !ok{
-			proxyIP = p.proxyListenAndAccept(peerID, message.DialAddress) //DialAddress应该是对方的公网IP, receiveUDPMessage的时候返回
-			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, message.DialAddress)
+			proxyIP = p.proxyListenAndAccept(peerID, remoteAddr) //DialAddress应该是对方的公网IP, receiveUDPMessage的时候返回
+			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, remoteAddr)
 		} else if peerInfo.(peer).addr != message.DialAddress {
 			p.proxies.Delete(peerID)
 			proxyIP = p.proxyListenAndAccept(peerID, message.DialAddress)
-			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, message.DialAddress)
+			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, remoteAddr)
 		}
 	}
 	return nil

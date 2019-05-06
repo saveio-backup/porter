@@ -26,11 +26,11 @@ func receiveUDPRawMessage(conn *net.UDPConn) []byte {
 	}
 }
 
-func receiveUDPMessage(conn *net.UDPConn) (*protobuf.Message) {
+func receiveUDPProxyMessage(conn *net.UDPConn) (*protobuf.Message, string) {
 	buffer := make([]byte, MAX_PACKAGE_SIZE)
 	length, remoteAddr, err :=conn.ReadFromUDP(buffer)
 	if remoteAddr == nil && length == 0 || err !=nil {
-		return  nil
+		return  nil, ""
 	}
 
 	size := binary.BigEndian.Uint16(buffer[0:2])
@@ -38,9 +38,9 @@ func receiveUDPMessage(conn *net.UDPConn) (*protobuf.Message) {
 	err = proto.Unmarshal(buffer[2:2+size], msg)
 	if err!=nil{
 		log.Errorf("receive udp message error:", err.Error())
-		return nil
+		return nil, ""
 	}
-	return msg
+	return msg, fmt.Sprintf("udp://%s",remoteAddr)
 }
 
 func prepareMessage(message proto.Message) ([]byte) {
@@ -75,7 +75,7 @@ func sendUDPMessage(message proto.Message,  udpConn *net.UDPConn, remoteAddr str
 	buffer := prepareMessage(message)
 	_, err=udpConn.WriteToUDP(buffer, resolved)
 	if err!=nil{
-		fmt.Println("err:", err.Error())
+		log.Error("err:", err.Error())
 	}
 }
 
@@ -87,6 +87,6 @@ func transferUDPRawMessage(message []byte,  udpConn *net.UDPConn, remoteAddr str
 	}
 	_, err=udpConn.WriteToUDP(message, resolved)
 	if err!=nil{
-		fmt.Println("err:", err.Error())
+		log.Error("err:", err.Error())
 	}
 }

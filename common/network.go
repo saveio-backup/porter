@@ -7,14 +7,14 @@ package common
 
 import (
 	"net"
-	"fmt"
 	"os"
+	"github.com/saveio/themis/common/log"
 )
 
 func GetLocalIP() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		fmt.Println(err)
+		log.Error("get local ip err:", err.Error())
 		os.Exit(1)
 	}
 
