@@ -9,19 +9,17 @@ import (
 	"net"
 	"strconv"
 	"sync"
-	"fmt"
-	"net/url"
 	"github.com/saveio/themis/common/log"
 	"math/rand"
 	"time"
-	"github.com/saveio/porter/internal/protobuf"
-	"encoding/hex"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/porter/common"
 )
 
 const (
 	MAX_PACKAGE_SIZE        = 1024 * 64
+	MONITOR_TIME_INTERVAL  	= 3
+	PEER_MONITOR_TIMEOUT	= 10 * time.Second
 )
 type port struct {
 	start 	uint32
@@ -30,25 +28,16 @@ type port struct {
 }
 
 type peer struct {
-	addr	string
-	conn 	*net.UDPConn
+	addr		string
+	conn 		*net.UDPConn
+	loginTime 	time.Time
+	updateTime 	time.Time
 }
 
 type ProxyServer struct {
 	listener 	*net.UDPConn
 	proxies 	*sync.Map
 	ports 		port
-}
-
-// AddressInfo represents a network URL.
-type addressInfo struct {
-	Protocol string
-	Host     string
-	Port     uint16
-}
-
-func(addr addressInfo) toString() string {
-	return fmt.Sprintf("%s:%d", addr.Host, addr.Port)
 }
 
 func init()  {
@@ -59,32 +48,6 @@ func Init() *ProxyServer {
 	return &ProxyServer{
 		proxies:new(sync.Map),
 	}
-}
-
-// ParseAddress derives a network scheme, host and port of a destinations
-// information. Errors should the provided destination address be malformed.
-//protocol://ip:port
-func ParseAddress(address string) (*addressInfo, error) {
-	urlInfo, err := url.Parse(address)
-	if err != nil {
-		return nil, err
-	}
-
-	host, rawPort, err := net.SplitHostPort(urlInfo.Host)
-	if err != nil {
-		return nil, err
-	}
-
-	port, err := strconv.ParseUint(rawPort, 10, 16)
-	if err != nil {
-		return nil, err
-	}
-
-	return &addressInfo{
-		Protocol: urlInfo.Scheme,
-		Host:     host,
-		Port:     uint16(port),
-	}, nil
 }
 
 // Listen listens for incoming UDP connections on a specified port.
@@ -119,7 +82,8 @@ func (p *ProxyServer)proxyListenAndAccept(peerID string, remoteAddr string) stri
 		return ""
 	}
 	log.Info("proxy-listen:", listener.LocalAddr().String())
-	p.proxies.Store(peerID, peer{addr:remoteAddr, conn:listener})
+	now := time.Now()
+	p.proxies.Store(peerID, peer{addr:remoteAddr, conn:listener, loginTime:now, updateTime:now})
 	go p.proxyAccept(listener, remoteAddr)
 	return listener.LocalAddr().String()
 }
@@ -141,37 +105,36 @@ func (p *ProxyServer) serverAccept() error {
 		if nil==message {
 			continue
 		}
-		if message.Opcode != uint32(opcode.ProxyRequestCode) {
-			continue
-		}
-
-		//if the client is working in public-net environment, return ip address directly
-		if message.Sender.Address == remoteAddr{
-			addrInfo, err:=ParseAddress(remoteAddr)
-			if err!=nil{
-				log.Error("parse remoteAddr err:", err.Error())
-				continue
-			}
-			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:addrInfo.toString()}, p.listener, remoteAddr)
-			continue
-		}
-
-		var proxyIP string
-		peerID := hex.EncodeToString(message.Sender.Id)
-
-		peerInfo, ok:=p.proxies.Load(peerID)
-		if !ok{
-			proxyIP = p.proxyListenAndAccept(peerID, remoteAddr) //DialAddress应该是对方的公网IP, receiveUDPMessage的时候返回
-			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, remoteAddr)
-		} else if peerInfo.(peer).addr != remoteAddr {
-			p.proxies.Delete(peerID)
-			proxyIP = p.proxyListenAndAccept(peerID, remoteAddr)
-			sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, remoteAddr)
+		switch message.Opcode {
+		case uint32(opcode.ProxyRequestCode):
+			p.handleProxyRequestMessage(message, remoteAddr)
+		case uint32(opcode.KeepaliveCode):
+			p.handleProxyKeepaliveMessage(message)
+		case uint32(opcode.DisconnectCode):
+			p.handleDisconnectMessage(message)
 		}
 	}
 	return nil
 }
 
+func (p *ProxyServer) monitorPeerStatus()  {
+	interval := time.Tick( MONITOR_TIME_INTERVAL * time.Second)
+	for {
+		select {
+		case <-interval:
+			p.proxies.Range(func(key, value interface{}) bool {
+				if time.Now().After(value.(peer).updateTime.Add(PEER_MONITOR_TIMEOUT)){
+					value.(peer).conn.Close()  //close listen server
+					p.proxies.Delete(key)
+					log.Info("client has disconnect from proxy server, peerID:", key.(string))
+				}
+				return true
+			})
+		}
+	}
+}
+
 func(p *ProxyServer) StartServer() {
+	go p.monitorPeerStatus()
 	p.serverListenAndAccept(common.GetLocalIP(),6008)
 }

@@ -65,8 +65,8 @@ func prepareMessage(message proto.Message) ([]byte) {
 }
 
 func sendUDPMessage(message proto.Message,  udpConn *net.UDPConn, remoteAddr string) {
-	addrInfo, err:=ParseAddress(remoteAddr)
-	resolved, err := net.ResolveUDPAddr("udp", addrInfo.toString())
+	addrInfo, err:=common.ParseAddress(remoteAddr)
+	resolved, err := net.ResolveUDPAddr("udp", addrInfo.ToString())
 	if err != nil {
 		log.Error("in serverAccept, resolve:",err.Error())
 	}
@@ -79,8 +79,8 @@ func sendUDPMessage(message proto.Message,  udpConn *net.UDPConn, remoteAddr str
 }
 
 func transferUDPRawMessage(message []byte,  udpConn *net.UDPConn, remoteAddr string) {
-	addrInfo, err:=ParseAddress(remoteAddr)
-	resolved, err := net.ResolveUDPAddr("udp", addrInfo.toString())
+	addrInfo, err:=common.ParseAddress(remoteAddr)
+	resolved, err := net.ResolveUDPAddr("udp", addrInfo.ToString())
 	if err != nil {
 		log.Error("in serverAccept, resolve:",err.Error())
 	}
