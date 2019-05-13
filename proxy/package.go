@@ -16,13 +16,13 @@ import (
 	"github.com/saveio/porter/common"
 )
 
-func receiveUDPRawMessage(conn *net.UDPConn) []byte {
+func receiveUDPRawMessage(conn *net.UDPConn) ([]byte, error) {
 	buffer := make([]byte, MAX_PACKAGE_SIZE)
 	length, remoteAddr, err :=conn.ReadFromUDP(buffer)
 	if remoteAddr == nil && length == 0 || err !=nil {
-		return  nil
+		return  nil, err
 	}else {
-		return buffer[:length]
+		return buffer[:length], nil
 	}
 }
 

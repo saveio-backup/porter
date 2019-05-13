@@ -32,6 +32,7 @@ type peer struct {
 	conn 		*net.UDPConn
 	loginTime 	time.Time
 	updateTime 	time.Time
+	stop 		chan struct{}
 }
 
 type ProxyServer struct {
@@ -82,19 +83,31 @@ func (p *ProxyServer)proxyListenAndAccept(peerID string, remoteAddr string) stri
 		return ""
 	}
 	log.Info("proxy-listen:", listener.LocalAddr().String())
-	now := time.Now()
-	p.proxies.Store(peerID, peer{addr:remoteAddr, conn:listener, loginTime:now, updateTime:now})
-	go p.proxyAccept(listener, remoteAddr)
+
+	peerInfo := peer{addr:remoteAddr,
+					conn:listener,
+					loginTime:time.Now(),
+					updateTime:time.Now(),
+					stop:make(chan struct{}),
+				}
+	p.proxies.Store(peerID, peerInfo)
+
+	go p.proxyAccept(peerInfo)
 	return listener.LocalAddr().String()
 }
 
-func (p *ProxyServer) proxyAccept(conn *net.UDPConn, remoteAddr string) error {
+func (p *ProxyServer) proxyAccept(peerInfo peer) error {
 	for {
-		message := receiveUDPRawMessage(conn)
-		if nil==message{
-			continue
+		select {
+		case <-peerInfo.stop:
+			return nil
+		default:
+			if message, err := receiveUDPRawMessage(peerInfo.conn); err == nil{
+				transferUDPRawMessage(message, p.listener, peerInfo.addr)
+			}else{
+				return err
+			}
 		}
-		transferUDPRawMessage(message, p.listener, remoteAddr)
 	}
 	return nil
 }
@@ -124,8 +137,7 @@ func (p *ProxyServer) monitorPeerStatus()  {
 		case <-interval:
 			p.proxies.Range(func(key, value interface{}) bool {
 				if time.Now().After(value.(peer).updateTime.Add(PEER_MONITOR_TIMEOUT)){
-					value.(peer).conn.Close()  //close listen server
-					p.proxies.Delete(key)
+					p.releasePeerResource(key.(string))
 					log.Info("client has disconnect from proxy server, peerID:", key.(string))
 				}
 				return true

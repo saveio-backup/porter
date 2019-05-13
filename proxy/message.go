@@ -54,10 +54,15 @@ func(p *ProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message){
 	}
 }
 
-func(p *ProxyServer) handleDisconnectMessage(message *protobuf.Message){
-	peerID := hex.EncodeToString(message.Sender.Id)
+func (p *ProxyServer) releasePeerResource(peerID string){
 	if peerInfo, ok := p.proxies.Load(peerID); ok{
+		//close(peerInfo.(peer).stop)
 		peerInfo.(peer).conn.Close()
 		p.proxies.Delete(peerID)
 	}
+}
+
+func(p *ProxyServer) handleDisconnectMessage(message *protobuf.Message){
+	peerID := hex.EncodeToString(message.Sender.Id)
+	p.releasePeerResource(peerID)
 }
