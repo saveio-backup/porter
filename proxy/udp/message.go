@@ -3,7 +3,7 @@
  * Author: Yihen.Liu
  * Create: 2019-05-09 
 */
-package proxy
+package udp
 
 import (
 	"github.com/saveio/porter/internal/protobuf"
@@ -51,6 +51,7 @@ func(p *ProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message){
 			updateTime: 	time.Now(),
 			loginTime:		peerInfo.(peer).loginTime,
 		})
+		sendUDPMessage(&protobuf.KeepaliveResponse{},p.listener, peerInfo.(peer).addr)
 	}
 }
 

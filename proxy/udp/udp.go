@@ -3,7 +3,7 @@
  * Author: Yihen.Liu
  * Create: 2019-04-26 
 */
-package proxy
+package udp
 
 import (
 	"net"
@@ -155,7 +155,7 @@ func (p *ProxyServer) monitorPeerStatus()  {
 	}
 }
 
-func(p *ProxyServer) StartServer() {
+func(p *ProxyServer) StartUDPServer() {
 	go p.monitorPeerStatus()
-	p.serverListenAndAccept(common.GetLocalIP(),6008)
+	go p.serverListenAndAccept(common.GetLocalIP(),6008)
 }

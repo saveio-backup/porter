@@ -3,7 +3,7 @@
  * Author: Yihen.Liu
  * Create: 2019-04-26 
 */
-package proxy
+package udp
 
 import (
 	"github.com/saveio/porter/internal/protobuf"
@@ -48,8 +48,9 @@ func prepareMessage(message proto.Message) ([]byte) {
 	if err != nil {
 		log.Error("in prepareMessage, (first) Marshal Message, ERROR:", err.Error())
 	}
+	codeNum, _:= opcode.GetOpcode(message)
 	msg := &protobuf.Message{
-		Opcode: 	uint32(opcode.ProxyResponseCode),
+		Opcode: 	uint32(codeNum),
 		Message: 	bytes,
 		Sender: 	&protobuf.ID{Address:fmt.Sprintf("udp://%s:6008", common.GetLocalIP()),},
 	}
