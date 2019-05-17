@@ -18,7 +18,6 @@ import (
 )
 
 const (
-	MAX_PACKAGE_SIZE        = 1024 * 64
 	MONITOR_TIME_INTERVAL  	= 3
 	PEER_MONITOR_TIMEOUT	= 10 * time.Second
 )
@@ -31,6 +30,7 @@ type port struct {
 type peer struct {
 	addr		string
 	conn 		net.Conn
+	listener	*kcp.Listener
 	loginTime 	time.Time
 	updateTime 	time.Time
 	stop 		chan struct{}
@@ -75,11 +75,17 @@ func(p *KcpProxyServer) kcpServerListenAndAccept(ip string, port uint16) {
 	p.serverAccept()
 }
 
-func (p *KcpProxyServer)proxyListenAndAccept(peerID string, listener net.Conn) string {
-	log.Info("proxy-listen:", listener.LocalAddr().String())
+func (p *KcpProxyServer)proxyListenAndAccept(peerID string, conn net.Conn) string {
+	port:= uint16(rand.Intn(10000)+55635)
+	listener, err:=listen(common.GetLocalIP(), port)
+	if err!=nil{
+		log.Error("proxy listen server start ERROR:", err.Error())
+		return ""
+	}
 
-	peerInfo := peer{addr:listener.RemoteAddr().String(),
-					conn:listener,
+	peerInfo := peer{addr:fmt.Sprintf("kcp://%s:%d", common.GetLocalIP(),port),
+					conn:conn,
+					listener:listener,
 					loginTime:time.Now(),
 					updateTime:time.Now(),
 					stop:make(chan struct{}),
@@ -87,21 +93,22 @@ func (p *KcpProxyServer)proxyListenAndAccept(peerID string, listener net.Conn) s
 	p.proxies.Store(peerID, peerInfo)
 
 	go p.proxyAccept(peerInfo)
-	return listener.LocalAddr().String()
+	return fmt.Sprintf("%s:%d", common.GetLocalIP(), port)
 }
 
 func (p *KcpProxyServer) proxyAccept(peerInfo peer) error {
-	for {
-		select {
-		case <-peerInfo.stop:
-			return nil
-		default:
-			if message, err := receiveKCPRawMessage(peerInfo.conn); err == nil{
-				transferKCPRawMessage(message, peerInfo.conn)
-			}else{
-				return err
-			}
+	for{
+		conn ,err := peerInfo.listener.Accept()
+		if err!=nil{
+			log.Error("peer proxy accept err:", err.Error())
+			continue
 		}
+		go func() {
+			for{
+				buffer, _:= receiveKCPRawMessage(conn)
+				transferKCPRawMessage(buffer, peerInfo.conn)
+			}
+		}()
 	}
 	return nil
 }
@@ -115,8 +122,6 @@ func (p *KcpProxyServer) serverAccept() error {
 		conn, err := p.listener.Accept()
 		if err!=nil{
 			log.Error("kcp listener accept error:", err.Error())
-		}else{
-			fmt.Println("server accept, peer addr:", conn.RemoteAddr().String())
 		}
 		message, err := receiveMessage(conn)
 		if nil==message || err!=nil {
@@ -150,7 +155,7 @@ func (p *KcpProxyServer) monitorPeerStatus()  {
 	}
 }
 
-func(p *KcpProxyServer) StartKCPServer() {
+func(p *KcpProxyServer) StartKCPServer(port uint16) {
 	//go p.monitorPeerStatus()
-	p.kcpServerListenAndAccept(common.GetLocalIP(),6008)
+	p.kcpServerListenAndAccept(common.GetLocalIP(),port)
 }

@@ -13,7 +13,23 @@ import (
 	"time"
 	"net"
 	"fmt"
+	"bufio"
 )
+const writeFLushLatency = 50 * time.Millisecond
+
+func flushLoop(conn net.Conn) {
+	writer:=bufio.NewWriterSize(conn, defaultRecvBufferSize)
+	t := time.NewTicker(writeFLushLatency)
+	defer t.Stop()
+	for {
+		select {
+		case <-t.C:
+			if err := writer.Flush(); err != nil {
+				log.Errorf("flush err: %+v", err)
+			}
+		}
+	}
+}
 
 func(p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, conn net.Conn){
 
@@ -27,20 +43,21 @@ func(p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, con
 		sendMessage(conn, &protobuf.ProxyResponse{ProxyAddress:addrInfo.ToString()})
 		return
 	}
-	fmt.Println("message.Sender.Address:", message.Sender.Address)
-	fmt.Println("remote addr:", conn.RemoteAddr().String())
+
 	var proxyIP string
 	peerID := hex.EncodeToString(message.Sender.Id)
 
 	peerInfo, ok:=p.proxies.Load(peerID)
 	if !ok{
 		proxyIP = p.proxyListenAndAccept(peerID, conn)
+		log.Info(fmt.Sprintf("origin (%s) relay ip is: %s", message.Sender.Address, proxyIP))
 		sendMessage(conn, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
 	} else if peerInfo.(peer).addr != conn.RemoteAddr().String() {
 		p.proxies.Delete(peerID)
 		proxyIP = p.proxyListenAndAccept(peerID, conn)
 		sendMessage(conn, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
 	}
+	go flushLoop(conn)
 }
 
 func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message){

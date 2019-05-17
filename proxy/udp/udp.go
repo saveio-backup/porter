@@ -155,7 +155,7 @@ func (p *ProxyServer) monitorPeerStatus()  {
 	}
 }
 
-func(p *ProxyServer) StartUDPServer() {
+func(p *ProxyServer) StartUDPServer(port uint16) {
 	go p.monitorPeerStatus()
-	go p.serverListenAndAccept(common.GetLocalIP(),6008)
+	go p.serverListenAndAccept(common.GetLocalIP(),port)
 }

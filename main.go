@@ -12,17 +12,18 @@ import (
 )
 
 func main() {
-	protocolFlag := flag.String("protocol", "", "protocol to use (kcp/tcp/udp)")
+	protocol:= flag.String("protocol", "", "protocol to use (kcp/tcp/udp)")
+	kport := flag.Uint("kport", 6009, "port for kcp protocol to use")
+	uport := flag.Uint("uport", 6008, "port for udp protocol to use")
 	flag.Parse()
-	protocol := *protocolFlag
-	switch protocol {
+	switch *protocol {
 	case "udp":
-		udpProxy.Init().StartUDPServer()
+		udpProxy.Init().StartUDPServer(uint16(*uport))
 	case "kcp":
-		kcpProxy.Init().StartKCPServer()
+		kcpProxy.Init().StartKCPServer(uint16(*kport))
 	default:
-		udpProxy.Init().StartUDPServer()
-		kcpProxy.Init().StartKCPServer()
+		udpProxy.Init().StartUDPServer(uint16(*uport))
+		kcpProxy.Init().StartKCPServer(uint16(*kport))
 	}
 	select {}
 }
