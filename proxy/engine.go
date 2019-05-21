@@ -14,6 +14,7 @@ import (
 	"time"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/porter/common"
+	"fmt"
 )
 
 const (
@@ -76,8 +77,16 @@ func(p *ProxyServer) serverListenAndAccept(ip string, port uint16)  {
 	p.serverAccept()
 }
 
+func (p *ProxyServer)publicIpForSpecProxy(listener*net.UDPConn, port uint16) string {
+	if common.Parameters.PublicIP == ""{
+		return listener.LocalAddr().String()
+	}
+	return fmt.Sprintf("%s:%d", common.Parameters.PublicIP,port)
+}
+
 func (p *ProxyServer)proxyListenAndAccept(peerID string, remoteAddr string) string {
-	listener, err:=listen(common.GetLocalIP(), uint16(rand.Intn(10000)+55635))
+	randomPort := common.RandomPort("udp")
+	listener, err:=listen(common.GetLocalIP(), randomPort)
 	if err!=nil{
 		log.Error("proxy listen server start ERROR:", err.Error())
 		return ""
@@ -93,7 +102,7 @@ func (p *ProxyServer)proxyListenAndAccept(peerID string, remoteAddr string) stri
 	p.proxies.Store(peerID, peerInfo)
 
 	go p.proxyAccept(peerInfo)
-	return listener.LocalAddr().String()
+	return p.publicIpForSpecProxy(listener, randomPort)
 }
 
 func (p *ProxyServer) proxyAccept(peerInfo peer) error {
