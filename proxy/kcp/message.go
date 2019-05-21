@@ -11,36 +11,33 @@ import (
 	"github.com/saveio/themis/common/log"
 	"github.com/saveio/porter/common"
 	"time"
-	"net"
 	"fmt"
-	"bufio"
 )
 const writeFLushLatency = 50 * time.Millisecond
 
-func flushLoop(conn net.Conn) {
-	writer:=bufio.NewWriterSize(conn, defaultRecvBufferSize)
+func flushLoop(state *ConnState) {
 	t := time.NewTicker(writeFLushLatency)
 	defer t.Stop()
 	for {
 		select {
 		case <-t.C:
-			if err := writer.Flush(); err != nil {
+			if err := state.writer.Flush(); err != nil {
 				log.Errorf("flush err: %+v", err)
 			}
 		}
 	}
 }
 
-func(p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, conn net.Conn){
+func(p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, state *ConnState){
 
 	//if the client is working in public-net environment, return ip address directly
-	if message.Sender.Address == conn.RemoteAddr().String() {
-		addrInfo, err:=common.ParseAddress(conn.RemoteAddr().String())
+	if message.Sender.Address == state.conn.RemoteAddr().String() {
+		addrInfo, err:=common.ParseAddress(state.conn.RemoteAddr().String())
 		if err!=nil{
 			log.Error("parse remoteAddr err:", err.Error())
 			return
 		}
-		sendMessage(conn, &protobuf.ProxyResponse{ProxyAddress:addrInfo.ToString()})
+		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:addrInfo.ToString()})
 		return
 	}
 
@@ -49,18 +46,18 @@ func(p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, con
 
 	peerInfo, ok:=p.proxies.Load(peerID)
 	if !ok{
-		proxyIP = p.proxyListenAndAccept(peerID, conn)
+		proxyIP = p.proxyListenAndAccept(peerID, state.conn)
 		log.Info(fmt.Sprintf("origin (%s) relay ip is: %s", message.Sender.Address, proxyIP))
-		sendMessage(conn, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
-	} else if peerInfo.(peer).addr != conn.RemoteAddr().String() {
+		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
+	} else if peerInfo.(peer).addr != state.conn.RemoteAddr().String() {
 		p.proxies.Delete(peerID)
-		proxyIP = p.proxyListenAndAccept(peerID, conn)
-		sendMessage(conn, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
+		proxyIP = p.proxyListenAndAccept(peerID, state.conn)
+		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
 	}
-	go flushLoop(conn)
+	//go flushLoop(state)
 }
 
-func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message){
+func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState){
 	peerID := hex.EncodeToString(message.Sender.Id)
 	if peerInfo, ok := p.proxies.Load(peerID); ok{
 		p.proxies.Delete(peerID)
@@ -71,6 +68,7 @@ func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message){
 			updateTime: 	time.Now(),
 			loginTime:		peerInfo.(peer).loginTime,
 		})
+		sendMessage(state, &protobuf.KeepaliveResponse{})
 	}
 }
 
@@ -84,5 +82,6 @@ func (p *KcpProxyServer) releasePeerResource(peerID string){
 
 func(p *KcpProxyServer) handleDisconnectMessage(message *protobuf.Message){
 	peerID := hex.EncodeToString(message.Sender.Id)
+	fmt.Println("peer disconnect...")
 	p.releasePeerResource(peerID)
 }

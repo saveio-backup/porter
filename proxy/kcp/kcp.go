@@ -15,6 +15,7 @@ import (
 	"github.com/saveio/porter/common"
 	"github.com/xtaci/kcp-go"
 	"fmt"
+	"bufio"
 )
 
 const (
@@ -42,6 +43,13 @@ type KcpProxyServer struct {
 	ports 		port
 }
 
+type ConnState struct {
+	conn         net.Conn
+	writer       *bufio.Writer
+	messageNonce uint64
+	writerMutex  *sync.Mutex
+}
+
 func init()  {
 	rand.Seed(time.Now().UnixNano())
 }
@@ -52,6 +60,14 @@ func Init() *KcpProxyServer {
 	}
 }
 
+func newConnState(conn net.Conn) *ConnState {
+	return &ConnState{
+		conn:conn,
+		writer:bufio.NewWriterSize(conn, defaultRecvBufferSize),
+		messageNonce:0,
+		writerMutex:new(sync.Mutex),
+	}
+}
 // Listen listens for incoming UDP connections on a specified port.
 func listen(ip string, port uint16)( *kcp.Listener,error) {
 	resolved:=fmt.Sprintf("%s:%d",ip,port)
@@ -123,18 +139,23 @@ func (p *KcpProxyServer) serverAccept() error {
 		if err!=nil{
 			log.Error("kcp listener accept error:", err.Error())
 		}
-		message, err := receiveMessage(conn)
-		if nil==message || err!=nil {
-			continue
-		}
-		switch message.Opcode {
-		case uint32(opcode.ProxyRequestCode):
-			p.handleProxyRequestMessage(message, conn)
-		case uint32(opcode.KeepaliveCode):
-			p.handleProxyKeepaliveMessage(message)
-		case uint32(opcode.DisconnectCode):
-			p.handleDisconnectMessage(message)
-		}
+		connState := newConnState(conn)
+		go func() {
+			for{
+				message, err := receiveMessage(conn)
+				if nil==message || err!=nil {
+					break
+				}
+				switch message.Opcode {
+				case uint32(opcode.ProxyRequestCode):
+					p.handleProxyRequestMessage(message, connState)
+				case uint32(opcode.KeepaliveCode):
+					p.handleProxyKeepaliveMessage(message, connState)
+				case uint32(opcode.DisconnectCode):
+					p.handleDisconnectMessage(message)
+				}
+			}
+		}()
 	}
 	return nil
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/saveio/porter/common"
 	"github.com/pkg/errors"
 	"bufio"
+	"sync/atomic"
 )
 
 const defaultRecvBufferSize    = 4 * 1024 * 1024
@@ -84,21 +85,27 @@ func  receiveMessage(conn net.Conn) (*protobuf.Message, error) {
 	return msg, nil
 }
 
-func prepareMessage(message proto.Message) (*protobuf.Message) {
+func prepareMessage(message proto.Message, state *ConnState) (*protobuf.Message) {
 	bytes, err := proto.Marshal(message)
 	if err != nil {
 		log.Error("in prepareMessage, (first) Marshal Message, ERROR:", err.Error())
 	}
+
+	opcode, err := opcode.GetOpcode(message)
+	if err != nil {
+		return nil
+	}
+
 	return  &protobuf.Message{
-		Opcode: 	uint32(opcode.ProxyResponseCode),
+		Opcode: 	uint32(opcode),
 		Message: 	bytes,
 		Sender: 	&protobuf.ID{Address:fmt.Sprintf("kcp://%s:6008", common.GetLocalIP()),},
+		MessageNonce: atomic.AddUint64(&state.messageNonce, 1),
 	}
 }
 
-func sendMessage( conn net.Conn, message proto.Message) error {
-	w:=bufio.NewWriterSize(conn, defaultRecvBufferSize)
-	bytes, err := proto.Marshal(prepareMessage(message))
+func sendMessage( state *ConnState, message proto.Message) error {
+	bytes, err := proto.Marshal(prepareMessage(message, state))
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal message")
 	}
@@ -113,28 +120,28 @@ func sendMessage( conn net.Conn, message proto.Message) error {
 	// Write until all bytes have been written.
 	bytesWritten, totalBytesWritten := 0, 0
 
-	//writerMutex.Lock()
+	state.writerMutex.Lock()
 
 	//bw, isBuffered := w.(*bufio.Writer)
-	if  (w.Buffered() > 0) && (w.Available() < totalSize) {
-		if err := w.Flush(); err != nil {
+	if  (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
+		if err := state.writer.Flush(); err != nil {
 			return err
 		}
 	}
 
 	for totalBytesWritten < len(buffer) && err == nil {
-		bytesWritten, err = w.Write(buffer[totalBytesWritten:])
+		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
 		if err != nil {
 			log.Errorf("stream: failed to write entire buffer, err: %+v", err)
 		}
 		totalBytesWritten += bytesWritten
-		err= w.Flush()
+		err= state.writer.Flush()
 		if err != nil {
 			log.Errorf("flush err: %+v", err)
 		}
 	}
 
-	//writerMutex.Unlock()
+	state.writerMutex.Unlock()
 	if err != nil {
 		return errors.Wrap(err, "stream: failed to write to socket")
 	}
