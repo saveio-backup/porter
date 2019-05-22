@@ -46,12 +46,12 @@ func(p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, sta
 
 	peerInfo, ok:=p.proxies.Load(peerID)
 	if !ok{
-		proxyIP = p.proxyListenAndAccept(peerID, state.conn)
+		proxyIP = p.proxyListenAndAccept(peerID, state)
 		log.Info(fmt.Sprintf("origin (%s) relay ip is: %s", message.Sender.Address, proxyIP))
 		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
 	} else if peerInfo.(peer).addr != state.conn.RemoteAddr().String() {
 		p.proxies.Delete(peerID)
-		proxyIP = p.proxyListenAndAccept(peerID, state.conn)
+		proxyIP = p.proxyListenAndAccept(peerID, state)
 		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
 	}
 	go flushLoop(state)

@@ -35,6 +35,7 @@ type peer struct {
 	loginTime 	time.Time
 	updateTime 	time.Time
 	stop 		chan struct{}
+	state  		*ConnState
 }
 
 type KcpProxyServer struct {
@@ -91,8 +92,8 @@ func(p *KcpProxyServer) kcpServerListenAndAccept(ip string, port uint16) {
 	p.serverAccept()
 }
 
-func (p *KcpProxyServer)proxyListenAndAccept(peerID string, conn net.Conn) string {
-	port:= uint16(rand.Intn(10000)+55635)
+func (p *KcpProxyServer)proxyListenAndAccept(peerID string, state *ConnState) string {
+	port:= common.RandomPort("kcp")
 	listener, err:=listen(common.GetLocalIP(), port)
 	if err!=nil{
 		log.Error("proxy listen server start ERROR:", err.Error())
@@ -100,7 +101,8 @@ func (p *KcpProxyServer)proxyListenAndAccept(peerID string, conn net.Conn) strin
 	}
 
 	peerInfo := peer{addr:fmt.Sprintf("kcp://%s:%d", common.GetLocalIP(),port),
-					conn:conn,
+					state:state,
+					conn:state.conn,
 					listener:listener,
 					loginTime:time.Now(),
 					updateTime:time.Now(),
@@ -109,7 +111,7 @@ func (p *KcpProxyServer)proxyListenAndAccept(peerID string, conn net.Conn) strin
 	p.proxies.Store(peerID, peerInfo)
 
 	go p.proxyAccept(peerInfo)
-	return fmt.Sprintf("%s:%d", common.GetLocalIP(), port)
+	return fmt.Sprintf("%s:%d", common.GetPublicIP(), port)
 }
 
 func (p *KcpProxyServer) proxyAccept(peerInfo peer) error {
@@ -120,9 +122,10 @@ func (p *KcpProxyServer) proxyAccept(peerInfo peer) error {
 			continue
 		}
 		go func() {
+			connState := newConnState(conn)
 			for{
-				buffer, _:= receiveKCPRawMessage(conn)
-				transferKCPRawMessage(buffer, peerInfo.conn)
+				buffer, _:= receiveKCPRawMessage(connState)
+				transferKCPRawMessage(buffer, peerInfo.state)
 			}
 		}()
 	}
@@ -139,10 +142,10 @@ func (p *KcpProxyServer) serverAccept() error {
 		if err!=nil{
 			log.Error("kcp listener accept error:", err.Error())
 		}
-		connState := newConnState(conn)
 		go func() {
+			connState := newConnState(conn)
 			for{
-				message, err := receiveMessage(conn)
+				message, err := receiveMessage(connState)
 				if nil==message || err!=nil {
 					break
 				}
@@ -178,5 +181,5 @@ func (p *KcpProxyServer) monitorPeerStatus()  {
 
 func(p *KcpProxyServer) StartKCPServer(port uint16) {
 	//go p.monitorPeerStatus()
-	p.kcpServerListenAndAccept(common.GetLocalIP(),port)
+	go p.kcpServerListenAndAccept(common.GetLocalIP(),port)
 }
