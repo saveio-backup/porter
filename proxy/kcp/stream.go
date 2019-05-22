@@ -11,7 +11,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/saveio/themis/common/log"
 	"net"
-	"fmt"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/porter/common"
 	"github.com/pkg/errors"
@@ -99,7 +98,7 @@ func prepareMessage(message proto.Message, state *ConnState) (*protobuf.Message)
 	return  &protobuf.Message{
 		Opcode: 	uint32(opcode),
 		Message: 	bytes,
-		Sender: 	&protobuf.ID{Address:fmt.Sprintf("kcp://%s:6008", common.GetLocalIP()),},
+		Sender: 	&protobuf.ID{Address:common.GetPublicHost("kcp"),},
 		MessageNonce: atomic.AddUint64(&state.messageNonce, 1),
 	}
 }

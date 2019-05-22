@@ -9,21 +9,20 @@ import (
 	udpProxy "github.com/saveio/porter/proxy/udp"
 	kcpProxy "github.com/saveio/porter/proxy/kcp"
 	"flag"
+	"github.com/saveio/porter/common"
 )
 
 func main() {
 	protocol:= flag.String("protocol", "", "protocol to use (kcp/tcp/udp)")
-	kport := flag.Uint("kport", 6009, "port for kcp protocol to use")
-	uport := flag.Uint("uport", 6008, "port for udp protocol to use")
 	flag.Parse()
 	switch *protocol {
 	case "udp":
-		udpProxy.Init().StartUDPServer(uint16(*uport))
+		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
 	case "kcp":
-		kcpProxy.Init().StartKCPServer(uint16(*kport))
+		kcpProxy.Init().StartKCPServer(uint16(common.GetPortFromParamsByProtocol("kcp")))
 	default:
-		udpProxy.Init().StartUDPServer(uint16(*uport))
-		kcpProxy.Init().StartKCPServer(uint16(*kport))
+		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
+		kcpProxy.Init().StartKCPServer(uint16(common.GetPortFromParamsByProtocol("kcp")))
 	}
 	select {}
 }

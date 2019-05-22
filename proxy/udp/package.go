@@ -52,7 +52,7 @@ func prepareMessage(message proto.Message) ([]byte) {
 	msg := &protobuf.Message{
 		Opcode: 	uint32(codeNum),
 		Message: 	bytes,
-		Sender: 	&protobuf.ID{Address:fmt.Sprintf("udp://%s:6008", common.GetLocalIP()),},
+		Sender: 	&protobuf.ID{Address:common.GetPublicHost("udp"),},
 	}
 	raw, err :=proto.Marshal(msg)
 	if err != nil {

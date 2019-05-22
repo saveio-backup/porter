@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"github.com/saveio/themis/common/log"
+	"fmt"
 )
 
 func GetLocalIP() string {
@@ -26,4 +27,27 @@ func GetLocalIP() string {
 		}
 	}
 	return ""
+}
+
+func GetPublicIP() string {
+	if Parameters.PublicIP == ""{
+		return GetLocalIP()
+	}
+	return  Parameters.PublicIP
+}
+
+func GetPortFromParamsByProtocol(protocol string) int {
+	switch protocol {
+	case "udp":
+		return Parameters.UPort
+	case "kcp":
+		return Parameters.KPort
+	default:
+		log.Error("please use correct protocol, kcp or udp. not support:", protocol)
+		return -1
+	}
+}
+
+func GetPublicHost(protocol string) string {
+	return fmt.Sprintf("%s://%s:%d", protocol, GetPublicIP(), GetPortFromParamsByProtocol(protocol))
 }

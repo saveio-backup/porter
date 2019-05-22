@@ -28,7 +28,7 @@ var ports Ports
 
 func RandomPort(protocol string) uint16 {
 	ports.writeMutex.Lock()
-	start:= rand.Intn(ports.begin)
+	start:= rand.Intn(ports.ranges)
 	for{
 		port := uint16(start+ports.begin)
 		if _, ok:= ports.usingPorts.Load(port); !ok {
@@ -40,7 +40,9 @@ func RandomPort(protocol string) uint16 {
 			case "tcp":
 				ports.usingPorts.Store(port,protocols{tcp:true})
 			default:
+				ports.writeMutex.Unlock()
 				log.Error("not support ", protocol, ", please use tcp/kcp/udp.")
+				return 0
 			}
 			ports.writeMutex.Unlock()
 			return port

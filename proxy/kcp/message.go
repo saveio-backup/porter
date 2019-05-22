@@ -54,7 +54,7 @@ func(p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, sta
 		proxyIP = p.proxyListenAndAccept(peerID, state.conn)
 		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
 	}
-	//go flushLoop(state)
+	go flushLoop(state)
 }
 
 func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState){
@@ -82,6 +82,5 @@ func (p *KcpProxyServer) releasePeerResource(peerID string){
 
 func(p *KcpProxyServer) handleDisconnectMessage(message *protobuf.Message){
 	peerID := hex.EncodeToString(message.Sender.Id)
-	fmt.Println("peer disconnect...")
 	p.releasePeerResource(peerID)
 }
