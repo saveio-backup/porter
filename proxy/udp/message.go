@@ -27,24 +27,24 @@ func(p *ProxyServer) handleProxyRequestMessage(message *protobuf.Message, remote
 	}
 
 	var proxyIP string
-	peerID := hex.EncodeToString(message.Sender.Id)
+	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
 
-	peerInfo, ok:=p.proxies.Load(peerID)
+	peerInfo, ok:=p.proxies.Load(ConnectionID)
 	if !ok{
-		proxyIP = p.proxyListenAndAccept(peerID, remoteAddr) //DialAddress应该是对方的公网IP, receiveUDPMessage的时候返回
+		proxyIP = p.proxyListenAndAccept(ConnectionID, remoteAddr) //DialAddress应该是对方的公网IP, receiveUDPMessage的时候返回
 		sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, remoteAddr)
 	} else if peerInfo.(peer).addr != remoteAddr {
-		p.proxies.Delete(peerID)
-		proxyIP = p.proxyListenAndAccept(peerID, remoteAddr)
+		p.proxies.Delete(ConnectionID)
+		proxyIP = p.proxyListenAndAccept(ConnectionID, remoteAddr)
 		sendUDPMessage(&protobuf.ProxyResponse{ProxyAddress:proxyIP}, p.listener, remoteAddr)
 	}
 }
 
 func(p *ProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message){
-	peerID := hex.EncodeToString(message.Sender.Id)
-	if peerInfo, ok := p.proxies.Load(peerID); ok{
-		p.proxies.Delete(peerID)
-		p.proxies.Store(peerID,
+	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
+	if peerInfo, ok := p.proxies.Load(ConnectionID); ok{
+		p.proxies.Delete(ConnectionID)
+		p.proxies.Store(ConnectionID,
 			peer{
 			addr: 			peerInfo.(peer).addr,
 			conn: 			peerInfo.(peer).conn,
@@ -55,15 +55,15 @@ func(p *ProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message){
 	}
 }
 
-func (p *ProxyServer) releasePeerResource(peerID string){
-	if peerInfo, ok := p.proxies.Load(peerID); ok{
+func (p *ProxyServer) releasePeerResource(ConnectionID string){
+	if peerInfo, ok := p.proxies.Load(ConnectionID); ok{
 		//close(peerInfo.(peer).stop)
 		peerInfo.(peer).conn.Close()
-		p.proxies.Delete(peerID)
+		p.proxies.Delete(ConnectionID)
 	}
 }
 
 func(p *ProxyServer) handleDisconnectMessage(message *protobuf.Message){
-	peerID := hex.EncodeToString(message.Sender.Id)
-	p.releasePeerResource(peerID)
+	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
+	p.releasePeerResource(ConnectionID)
 }

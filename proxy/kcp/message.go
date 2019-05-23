@@ -42,26 +42,26 @@ func(p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, sta
 	}
 
 	var proxyIP string
-	peerID := hex.EncodeToString(message.Sender.Id)
+	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
 
-	peerInfo, ok:=p.proxies.Load(peerID)
+	peerInfo, ok:=p.proxies.Load(ConnectionID)
 	if !ok{
-		proxyIP = p.proxyListenAndAccept(peerID, state)
+		proxyIP = p.proxyListenAndAccept(ConnectionID, state)
 		log.Info(fmt.Sprintf("origin (%s) relay ip is: %s", message.Sender.Address, proxyIP))
 		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
 	} else if peerInfo.(peer).addr != state.conn.RemoteAddr().String() {
-		p.proxies.Delete(peerID)
-		proxyIP = p.proxyListenAndAccept(peerID, state)
+		p.proxies.Delete(ConnectionID)
+		proxyIP = p.proxyListenAndAccept(ConnectionID, state)
 		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
 	}
 	go flushLoop(state)
 }
 
 func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState){
-	peerID := hex.EncodeToString(message.Sender.Id)
-	if peerInfo, ok := p.proxies.Load(peerID); ok{
-		p.proxies.Delete(peerID)
-		p.proxies.Store(peerID,
+	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
+	if peerInfo, ok := p.proxies.Load(ConnectionID); ok{
+		p.proxies.Delete(ConnectionID)
+		p.proxies.Store(ConnectionID,
 			peer{
 			addr: 			peerInfo.(peer).addr,
 			conn: 			peerInfo.(peer).conn,
@@ -72,15 +72,15 @@ func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, s
 	}
 }
 
-func (p *KcpProxyServer) releasePeerResource(peerID string){
-	if peerInfo, ok := p.proxies.Load(peerID); ok{
+func (p *KcpProxyServer) releasePeerResource(ConnectionID string){
+	if peerInfo, ok := p.proxies.Load(ConnectionID); ok{
 		//close(peerInfo.(peer).stop)
 		peerInfo.(peer).conn.Close()
-		p.proxies.Delete(peerID)
+		p.proxies.Delete(ConnectionID)
 	}
 }
 
 func(p *KcpProxyServer) handleDisconnectMessage(message *protobuf.Message){
-	peerID := hex.EncodeToString(message.Sender.Id)
-	p.releasePeerResource(peerID)
+	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
+	p.releasePeerResource(ConnectionID)
 }

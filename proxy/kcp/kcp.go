@@ -92,7 +92,7 @@ func(p *KcpProxyServer) kcpServerListenAndAccept(ip string, port uint16) {
 	p.serverAccept()
 }
 
-func (p *KcpProxyServer)proxyListenAndAccept(peerID string, state *ConnState) string {
+func (p *KcpProxyServer)proxyListenAndAccept(ConnectionID string, state *ConnState) string {
 	port:= common.RandomPort("kcp")
 	listener, err:=listen(common.GetLocalIP(), port)
 	if err!=nil{
@@ -108,7 +108,7 @@ func (p *KcpProxyServer)proxyListenAndAccept(peerID string, state *ConnState) st
 					updateTime:time.Now(),
 					stop:make(chan struct{}),
 				}
-	p.proxies.Store(peerID, peerInfo)
+	p.proxies.Store(ConnectionID, peerInfo)
 
 	go p.proxyAccept(peerInfo)
 	return fmt.Sprintf("%s:%d", common.GetPublicIP(), port)

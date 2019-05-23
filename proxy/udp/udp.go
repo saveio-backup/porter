@@ -84,7 +84,7 @@ func (p *ProxyServer)publicHostForSpecProxy(listener*net.UDPConn, port uint16) s
 	return fmt.Sprintf("%s:%d", common.Parameters.PublicIP,port)
 }
 
-func (p *ProxyServer)proxyListenAndAccept(peerID string, remoteAddr string) string {
+func (p *ProxyServer)proxyListenAndAccept(ConnectionID string, remoteAddr string) string {
 	randomPort := common.RandomPort("udp")
 	listener, err:=listen(common.GetLocalIP(), randomPort)
 	if err!=nil{
@@ -99,7 +99,7 @@ func (p *ProxyServer)proxyListenAndAccept(peerID string, remoteAddr string) stri
 					updateTime:time.Now(),
 					stop:make(chan struct{}),
 				}
-	p.proxies.Store(peerID, peerInfo)
+	p.proxies.Store(ConnectionID, peerInfo)
 
 	go p.proxyAccept(peerInfo)
 	return p.publicHostForSpecProxy(listener, randomPort)
