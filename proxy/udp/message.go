@@ -50,6 +50,7 @@ func(p *ProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message){
 			conn: 			peerInfo.(peer).conn,
 			updateTime: 	time.Now(),
 			loginTime:		peerInfo.(peer).loginTime,
+			stop: 			peerInfo.(peer).stop,
 		})
 		sendUDPMessage(&protobuf.KeepaliveResponse{},p.listener, peerInfo.(peer).addr)
 	}
@@ -57,7 +58,7 @@ func(p *ProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message){
 
 func (p *ProxyServer) releasePeerResource(ConnectionID string){
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok{
-		//close(peerInfo.(peer).stop)
+		close(peerInfo.(peer).stop)
 		peerInfo.(peer).conn.Close()
 		p.proxies.Delete(ConnectionID)
 	}

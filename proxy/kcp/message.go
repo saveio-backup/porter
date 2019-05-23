@@ -20,10 +20,14 @@ func flushLoop(state *ConnState) {
 	defer t.Stop()
 	for {
 		select {
+		case <-state.stop:
+			return
 		case <-t.C:
+			state.writerMutex.Lock()
 			if err := state.writer.Flush(); err != nil {
 				log.Errorf("flush err: %+v", err)
 			}
+			state.writerMutex.Unlock()
 		}
 	}
 }
@@ -67,6 +71,8 @@ func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, s
 			conn: 			peerInfo.(peer).conn,
 			updateTime: 	time.Now(),
 			loginTime:		peerInfo.(peer).loginTime,
+			stop:			peerInfo.(peer).stop,
+			state:			peerInfo.(peer).state,
 		})
 		sendMessage(state, &protobuf.KeepaliveResponse{})
 	}
@@ -74,8 +80,10 @@ func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, s
 
 func (p *KcpProxyServer) releasePeerResource(ConnectionID string){
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok{
-		//close(peerInfo.(peer).stop)
+		close(peerInfo.(peer).stop)
+		close(peerInfo.(peer).state.stop)
 		peerInfo.(peer).conn.Close()
+		peerInfo.(peer).state.conn.Close()
 		p.proxies.Delete(ConnectionID)
 	}
 }

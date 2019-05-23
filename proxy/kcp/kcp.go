@@ -49,6 +49,7 @@ type ConnState struct {
 	writer       *bufio.Writer
 	messageNonce uint64
 	writerMutex  *sync.Mutex
+	stop 		chan struct{}
 }
 
 func init()  {
@@ -63,10 +64,11 @@ func Init() *KcpProxyServer {
 
 func newConnState(conn net.Conn) *ConnState {
 	return &ConnState{
-		conn:conn,
-		writer:bufio.NewWriterSize(conn, defaultRecvBufferSize),
-		messageNonce:0,
-		writerMutex:new(sync.Mutex),
+		conn:			conn,
+		writer:			bufio.NewWriterSize(conn, defaultRecvBufferSize),
+		messageNonce:	0,
+		writerMutex:	new(sync.Mutex),
+		stop:			make(chan struct{}),
 	}
 }
 // Listen listens for incoming UDP connections on a specified port.
@@ -121,8 +123,14 @@ func (p *KcpProxyServer) proxyAccept(peerInfo peer) error {
 			log.Error("peer proxy accept err:", err.Error())
 			continue
 		}
+
 		go func() {
+			defer func() {
+				conn.Close()
+			}()
+
 			connState := newConnState(conn)
+			close(connState.stop)
 			for{
 				buffer, _:= receiveKCPRawMessage(connState)
 				transferKCPRawMessage(buffer, peerInfo.state)
@@ -180,6 +188,6 @@ func (p *KcpProxyServer) monitorPeerStatus()  {
 }
 
 func(p *KcpProxyServer) StartKCPServer(port uint16) {
-	//go p.monitorPeerStatus()
+	go p.monitorPeerStatus()
 	go p.kcpServerListenAndAccept(common.GetLocalIP(),port)
 }
