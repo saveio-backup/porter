@@ -1,60 +1,61 @@
 /**
  * Description:
  * Author: Yihen.Liu
- * Create: 2019-04-26 
-*/
+ * Create: 2019-04-26
+ */
 package udp
 
 import (
+	"fmt"
+	"github.com/saveio/porter/common"
+	"github.com/saveio/porter/types/opcode"
+	"github.com/saveio/themis/common/log"
+	"math/rand"
 	"net"
 	"strconv"
 	"sync"
-	"github.com/saveio/themis/common/log"
-	"math/rand"
 	"time"
-	"github.com/saveio/porter/types/opcode"
-	"github.com/saveio/porter/common"
-	"fmt"
 )
 
 const (
-	MAX_PACKAGE_SIZE        = 1024 * 64
-	MONITOR_TIME_INTERVAL  	= 3
-	PEER_MONITOR_TIMEOUT	= 10 * time.Second
+	MAX_PACKAGE_SIZE      = 1024 * 64
+	MONITOR_TIME_INTERVAL = 3
+	PEER_MONITOR_TIMEOUT  = 10 * time.Second
 )
+
 type port struct {
-	start 	uint32
-	end 	uint32
-	used 	uint32
+	start uint32
+	end   uint32
+	used  uint32
 }
 
 type peer struct {
-	addr		string
-	conn 		*net.UDPConn
-	loginTime 	time.Time
-	updateTime 	time.Time
-	stop 		chan struct{}
+	addr       string
+	conn       *net.UDPConn
+	loginTime  time.Time
+	updateTime time.Time
+	stop       chan struct{}
 }
 
 type ProxyServer struct {
-	listener 	*net.UDPConn
-	proxies 	*sync.Map
-	ports 		port
+	listener *net.UDPConn
+	proxies  *sync.Map
+	ports    port
 }
 
-func init()  {
+func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
 func Init() *ProxyServer {
 	return &ProxyServer{
-		proxies:new(sync.Map),
+		proxies: new(sync.Map),
 	}
 }
 
 // Listen listens for incoming UDP connections on a specified port.
-func listen(ip string, port uint16)( *net.UDPConn,error) {
-	resolved, err := net.ResolveUDPAddr("udp", ip + ":"+strconv.Itoa(int(port)))
+func listen(ip string, port uint16) (*net.UDPConn, error) {
+	resolved, err := net.ResolveUDPAddr("udp", ip+":"+strconv.Itoa(int(port)))
 	if err != nil {
 		return nil, err
 	}
@@ -63,42 +64,42 @@ func listen(ip string, port uint16)( *net.UDPConn,error) {
 		return nil, err
 	}
 
-	return listener,nil
+	return listener, nil
 }
 
-func(p *ProxyServer) serverListenAndAccept(ip string, port uint16)  {
+func (p *ProxyServer) serverListenAndAccept(ip string, port uint16) {
 	var err error
-	p.listener,err = listen(ip, port)
-	if err!=nil{
+	p.listener, err = listen(ip, port)
+	if err != nil {
 		log.Errorf("server listen start ERROR:", err.Error())
-	}else{
-		log.Info("Proxy Listen IP:",ip,", Port:",port)
+	} else {
+		log.Info("Proxy Listen IP:", ip, ", Port:", port)
 	}
 	p.serverAccept()
 }
 
-func (p *ProxyServer)publicHostForSpecProxy(listener*net.UDPConn, port uint16) string {
-	if common.Parameters.PublicIP == ""{
+func (p *ProxyServer) publicHostForSpecProxy(listener *net.UDPConn, port uint16) string {
+	if common.Parameters.PublicIP == "" {
 		return listener.LocalAddr().String()
 	}
-	return fmt.Sprintf("%s:%d", common.Parameters.PublicIP,port)
+	return fmt.Sprintf("%s:%d", common.Parameters.PublicIP, port)
 }
 
-func (p *ProxyServer)proxyListenAndAccept(ConnectionID string, remoteAddr string) string {
+func (p *ProxyServer) proxyListenAndAccept(ConnectionID string, remoteAddr string) string {
 	randomPort := common.RandomPort("udp")
-	listener, err:=listen(common.GetLocalIP(), randomPort)
-	if err!=nil{
+	listener, err := listen(common.GetLocalIP(), randomPort)
+	if err != nil {
 		log.Error("proxy listen server start ERROR:", err.Error())
 		return ""
 	}
 	log.Info("proxy-listen:", listener.LocalAddr().String())
 
-	peerInfo := peer{addr:remoteAddr,
-					conn:listener,
-					loginTime:time.Now(),
-					updateTime:time.Now(),
-					stop:make(chan struct{}),
-				}
+	peerInfo := peer{addr: remoteAddr,
+		conn:       listener,
+		loginTime:  time.Now(),
+		updateTime: time.Now(),
+		stop:       make(chan struct{}),
+	}
 	p.proxies.Store(ConnectionID, peerInfo)
 
 	go p.proxyAccept(peerInfo)
@@ -111,9 +112,9 @@ func (p *ProxyServer) proxyAccept(peerInfo peer) error {
 		case <-peerInfo.stop:
 			return nil
 		default:
-			if message, err := receiveUDPRawMessage(peerInfo.conn); err == nil{
+			if message, err := receiveUDPRawMessage(peerInfo.conn); err == nil {
 				transferUDPRawMessage(message, p.listener, peerInfo.addr)
-			}else{
+			} else {
 				return err
 			}
 		}
@@ -124,7 +125,7 @@ func (p *ProxyServer) proxyAccept(peerInfo peer) error {
 func (p *ProxyServer) serverAccept() error {
 	for {
 		message, remoteAddr := receiveUDPProxyMessage(p.listener)
-		if nil==message {
+		if nil == message {
 			continue
 		}
 		switch message.Opcode {
@@ -139,13 +140,13 @@ func (p *ProxyServer) serverAccept() error {
 	return nil
 }
 
-func (p *ProxyServer) monitorPeerStatus()  {
-	interval := time.Tick( MONITOR_TIME_INTERVAL * time.Second)
+func (p *ProxyServer) monitorPeerStatus() {
+	interval := time.Tick(MONITOR_TIME_INTERVAL * time.Second)
 	for {
 		select {
 		case <-interval:
 			p.proxies.Range(func(key, value interface{}) bool {
-				if time.Now().After(value.(peer).updateTime.Add(PEER_MONITOR_TIMEOUT)){
+				if time.Now().After(value.(peer).updateTime.Add(PEER_MONITOR_TIMEOUT)) {
 					p.releasePeerResource(key.(string))
 					log.Info("client has disconnect from proxy server, peerID:", key.(string))
 				}
@@ -155,7 +156,7 @@ func (p *ProxyServer) monitorPeerStatus()  {
 	}
 }
 
-func(p *ProxyServer) StartUDPServer(port uint16) {
+func (p *ProxyServer) StartUDPServer(port uint16) {
 	go p.monitorPeerStatus()
-	go p.serverListenAndAccept(common.GetLocalIP(),port)
+	go p.serverListenAndAccept(common.GetLocalIP(), port)
 }

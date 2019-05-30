@@ -1,18 +1,19 @@
 /**
  * Description:
  * Author: Yihen.Liu
- * Create: 2019-05-09 
-*/
+ * Create: 2019-05-09
+ */
 package kcp
 
 import (
-	"github.com/saveio/porter/internal/protobuf"
 	"encoding/hex"
-	"github.com/saveio/themis/common/log"
 	"github.com/saveio/porter/common"
+	"github.com/saveio/porter/internal/protobuf"
+	"github.com/saveio/porter/types/opcode"
+	"github.com/saveio/themis/common/log"
 	"time"
-	"fmt"
 )
+
 const writeFLushLatency = 50 * time.Millisecond
 
 func flushLoop(state *ConnState) {
@@ -32,54 +33,8 @@ func flushLoop(state *ConnState) {
 	}
 }
 
-func(p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, state *ConnState){
-
-	//if the client is working in public-net environment, return ip address directly
-	if message.Sender.Address == state.conn.RemoteAddr().String() {
-		addrInfo, err:=common.ParseAddress(state.conn.RemoteAddr().String())
-		if err!=nil{
-			log.Error("parse remoteAddr err:", err.Error())
-			return
-		}
-		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:addrInfo.ToString()})
-		return
-	}
-
-	var proxyIP string
-	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
-
-	peerInfo, ok:=p.proxies.Load(ConnectionID)
-	if !ok{
-		proxyIP = p.proxyListenAndAccept(ConnectionID, state)
-		log.Info(fmt.Sprintf("origin (%s) relay ip is: %s", message.Sender.Address, proxyIP))
-		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
-	} else if peerInfo.(peer).addr != state.conn.RemoteAddr().String() {
-		p.proxies.Delete(ConnectionID)
-		proxyIP = p.proxyListenAndAccept(ConnectionID, state)
-		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress:proxyIP})
-	}
-	go flushLoop(state)
-}
-
-func(p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState){
-	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
-	if peerInfo, ok := p.proxies.Load(ConnectionID); ok{
-		p.proxies.Delete(ConnectionID)
-		p.proxies.Store(ConnectionID,
-			peer{
-			addr: 			peerInfo.(peer).addr,
-			conn: 			peerInfo.(peer).conn,
-			updateTime: 	time.Now(),
-			loginTime:		peerInfo.(peer).loginTime,
-			stop:			peerInfo.(peer).stop,
-			state:			peerInfo.(peer).state,
-		})
-		sendMessage(state, &protobuf.KeepaliveResponse{})
-	}
-}
-
-func (p *KcpProxyServer) releasePeerResource(ConnectionID string){
-	if peerInfo, ok := p.proxies.Load(ConnectionID); ok{
+func (p *KcpProxyServer) releasePeerResource(ConnectionID string) {
+	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
 		close(peerInfo.(peer).stop)
 		close(peerInfo.(peer).state.stop)
 		peerInfo.(peer).conn.Close()
@@ -88,7 +43,58 @@ func (p *KcpProxyServer) releasePeerResource(ConnectionID string){
 	}
 }
 
-func(p *KcpProxyServer) handleDisconnectMessage(message *protobuf.Message){
+func (p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, state *ConnState) {
+
+	//if the client is working in public-net environment, return ip address directly
+	if message.Sender.Address == state.conn.RemoteAddr().String() {
+		addrInfo, err := common.ParseAddress(state.conn.RemoteAddr().String())
+		if err != nil {
+			log.Error("parse remoteAddr err:", err.Error())
+			return
+		}
+		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress: addrInfo.ToString()})
+		return
+	}
+
+	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
+	p.listenerBuffer <- peerListen{connectionID: ConnectionID, state: state}
+	go flushLoop(state)
+}
+
+func (p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState) {
+	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
+	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
+		p.proxies.Delete(ConnectionID)
+		p.proxies.Store(ConnectionID,
+			peer{
+				addr:       peerInfo.(peer).addr,
+				conn:       peerInfo.(peer).conn,
+				updateTime: time.Now(),
+				loginTime:  peerInfo.(peer).loginTime,
+				stop:       peerInfo.(peer).stop,
+				state:      peerInfo.(peer).state,
+			})
+		sendMessage(state, &protobuf.KeepaliveResponse{})
+	}
+}
+
+func (p *KcpProxyServer) handleDisconnectMessage(message *protobuf.Message) {
 	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
 	p.releasePeerResource(ConnectionID)
+}
+
+func (p *KcpProxyServer) handleControlMessage() {
+	for {
+		select {
+		case item := <-p.msgBuffer:
+			switch item.message.Opcode {
+			case uint32(opcode.ProxyRequestCode):
+				p.handleProxyRequestMessage(item.message, item.state)
+			case uint32(opcode.KeepaliveCode):
+				p.handleProxyKeepaliveMessage(item.message, item.state)
+			case uint32(opcode.DisconnectCode):
+				p.handleDisconnectMessage(item.message)
+			}
+		}
+	}
 }

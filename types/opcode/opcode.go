@@ -1,16 +1,16 @@
 /**
  * Description:
  * Author: Yihen.Liu
- * Create: 2019-04-29 
-*/
+ * Create: 2019-04-29
+ */
 package opcode
 
 import (
-	"reflect"
+	"errors"
 	"github.com/golang/protobuf/proto"
 	"github.com/saveio/porter/internal/protobuf"
+	"reflect"
 	"sync"
-	"errors"
 )
 
 func init() {

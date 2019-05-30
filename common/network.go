@@ -1,15 +1,15 @@
 /**
  * Description:
  * Author: Yihen.Liu
- * Create: 2019-05-05 
-*/
+ * Create: 2019-05-05
+ */
 package common
 
 import (
+	"fmt"
+	"github.com/saveio/themis/common/log"
 	"net"
 	"os"
-	"github.com/saveio/themis/common/log"
-	"fmt"
 )
 
 func GetLocalIP() string {
@@ -30,10 +30,10 @@ func GetLocalIP() string {
 }
 
 func GetPublicIP() string {
-	if Parameters.PublicIP == ""{
+	if Parameters.PublicIP == "" {
 		return GetLocalIP()
 	}
-	return  Parameters.PublicIP
+	return Parameters.PublicIP
 }
 
 func GetPortFromParamsByProtocol(protocol string) int {

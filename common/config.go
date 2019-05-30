@@ -1,16 +1,16 @@
 /**
  * Description:
  * Author: Yihen.Liu
- * Create: 2019-05-20 
-*/
+ * Create: 2019-05-20
+ */
 package common
 
 import (
-"bytes"
-"encoding/json"
-"io/ioutil"
-"log"
-"os"
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
+	"log"
+	"os"
 )
 
 const (
@@ -20,11 +20,11 @@ const (
 var Version string
 
 type Configuration struct {
-	PublicIP    	string  `json:"PublicIP"`
-	RandomPortBegin int 	`json:"RandomPortBegin"`
-	RandomPortRange int 	`json:"RandomPortRange"`
-	UPort			int 	`json:"UPort"`
-	KPort			int 	`json:"KPort"`
+	PublicIP        string `json:"PublicIP"`
+	RandomPortBegin int    `json:"RandomPortBegin"`
+	RandomPortRange int    `json:"RandomPortRange"`
+	UPort           int    `json:"UPort"`
+	KPort           int    `json:"KPort"`
 }
 
 type ConfigFile struct {

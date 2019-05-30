@@ -1,15 +1,15 @@
 /**
  * Description:
  * Author: Yihen.Liu
- * Create: 2019-05-09 
-*/
+ * Create: 2019-05-09
+ */
 package common
 
 import (
-	"net/url"
-	"net"
-	"strconv"
 	"fmt"
+	"net"
+	"net/url"
+	"strconv"
 )
 
 // AddressInfo represents a network URL.
@@ -19,9 +19,10 @@ type addressInfo struct {
 	Port     uint16
 }
 
-func(addr addressInfo) ToString() string {
+func (addr addressInfo) ToString() string {
 	return fmt.Sprintf("%s:%d", addr.Host, addr.Port)
 }
+
 // ParseAddress derives a network scheme, host and port of a destinations
 // information. Errors should the provided destination address be malformed.
 //protocol://ip:port

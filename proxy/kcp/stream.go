@@ -1,24 +1,24 @@
 /**
  * Description:
  * Author: Yihen.Liu
- * Create: 2019-04-26 
-*/
+ * Create: 2019-04-26
+ */
 package kcp
 
 import (
-	"github.com/saveio/porter/internal/protobuf"
 	"encoding/binary"
 	"github.com/golang/protobuf/proto"
-	"github.com/saveio/themis/common/log"
-	"github.com/saveio/porter/types/opcode"
-	"github.com/saveio/porter/common"
 	"github.com/pkg/errors"
+	"github.com/saveio/porter/common"
+	"github.com/saveio/porter/internal/protobuf"
+	"github.com/saveio/porter/types/opcode"
+	"github.com/saveio/themis/common/log"
 	"sync/atomic"
 )
 
-const defaultRecvBufferSize    = 4 * 1024 * 1024
+const defaultRecvBufferSize = 4 * 1024 * 1024
 
-func  receiveKCPRawMessage(state *ConnState) ([]byte, error) {
+func receiveKCPRawMessage(state *ConnState) ([]byte, error) {
 	var err error
 	var size uint32
 	// Read until all header bytes have been read.
@@ -36,15 +36,13 @@ func  receiveKCPRawMessage(state *ConnState) ([]byte, error) {
 
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
-
-		//bytesRead, err = conn.Read(buffer[totalBytesRead:])
 		totalBytesRead += bytesRead
 	}
 
 	return append(sizeBuf, buffer...), nil
 }
 
-func  receiveMessage(state *ConnState) (*protobuf.Message, error) {
+func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	var err error
 	var size uint32
 	// Read until all header bytes have been read.
@@ -64,8 +62,6 @@ func  receiveMessage(state *ConnState) (*protobuf.Message, error) {
 
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
-
-		//bytesRead, err = conn.Read(buffer[totalBytesRead:])
 		totalBytesRead += bytesRead
 	}
 
@@ -82,7 +78,7 @@ func  receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	return msg, nil
 }
 
-func prepareMessage(message proto.Message, state *ConnState) (*protobuf.Message) {
+func prepareMessage(message proto.Message, state *ConnState) *protobuf.Message {
 	bytes, err := proto.Marshal(message)
 	if err != nil {
 		log.Error("in prepareMessage, (first) Marshal Message, ERROR:", err.Error())
@@ -93,15 +89,15 @@ func prepareMessage(message proto.Message, state *ConnState) (*protobuf.Message)
 		return nil
 	}
 
-	return  &protobuf.Message{
-		Opcode: 	uint32(opcode),
-		Message: 	bytes,
-		Sender: 	&protobuf.ID{Address:common.GetPublicHost("kcp"),},
+	return &protobuf.Message{
+		Opcode:       uint32(opcode),
+		Message:      bytes,
+		Sender:       &protobuf.ID{Address: common.GetPublicHost("kcp")},
 		MessageNonce: atomic.AddUint64(&state.messageNonce, 1),
 	}
 }
 
-func sendMessage( state *ConnState, message proto.Message) error {
+func sendMessage(state *ConnState, message proto.Message) error {
 	bytes, err := proto.Marshal(prepareMessage(message, state))
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal message")
@@ -120,7 +116,7 @@ func sendMessage( state *ConnState, message proto.Message) error {
 	state.writerMutex.Lock()
 
 	//bw, isBuffered := w.(*bufio.Writer)
-	if  (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
+	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
 		if err := state.writer.Flush(); err != nil {
 			return err
 		}
@@ -132,10 +128,6 @@ func sendMessage( state *ConnState, message proto.Message) error {
 			log.Errorf("stream: failed to write entire buffer, err: %+v", err)
 		}
 		totalBytesWritten += bytesWritten
-/*		err= state.writer.Flush()
-		if err != nil {
-			log.Errorf("flush err: %+v", err)
-		}*/
 	}
 
 	state.writerMutex.Unlock()
@@ -146,7 +138,7 @@ func sendMessage( state *ConnState, message proto.Message) error {
 	return nil
 }
 
-func transferKCPRawMessage(message []byte,  state *ConnState) error {
+func transferKCPRawMessage(message []byte, state *ConnState) error {
 	totalSize := len(message)
 
 	// Write until all bytes have been written.
@@ -154,7 +146,7 @@ func transferKCPRawMessage(message []byte,  state *ConnState) error {
 
 	state.writerMutex.Lock()
 
-	if  (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
+	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
 		if err := state.writer.Flush(); err != nil {
 			return err
 		}
@@ -167,10 +159,6 @@ func transferKCPRawMessage(message []byte,  state *ConnState) error {
 		}
 		totalBytesWritten += bytesWritten
 	}
-/*	err= state.writer.Flush()
-	if err != nil {
-		log.Errorf("flush err: %+v", err)
-	}*/
 	state.writerMutex.Unlock()
 
 	if err != nil {

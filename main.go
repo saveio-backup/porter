@@ -1,19 +1,19 @@
 /**
  * Description:
  * Author: Yihen.Liu
- * Create: 2019-04-26 
-*/
+ * Create: 2019-04-26
+ */
 package main
 
 import (
-	udpProxy "github.com/saveio/porter/proxy/udp"
-	kcpProxy "github.com/saveio/porter/proxy/kcp"
 	"flag"
 	"github.com/saveio/porter/common"
+	kcpProxy "github.com/saveio/porter/proxy/kcp"
+	udpProxy "github.com/saveio/porter/proxy/udp"
 )
 
 func main() {
-	protocol:= flag.String("protocol", "", "protocol to use (kcp/tcp/udp)")
+	protocol := flag.String("protocol", "", "protocol to use (kcp/tcp/udp)")
 	flag.Parse()
 	switch *protocol {
 	case "udp":
