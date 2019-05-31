@@ -15,6 +15,7 @@ type protocols struct {
 	udp bool
 	kcp bool
 	tcp bool
+	quic bool
 }
 
 type Ports struct {
@@ -39,9 +40,11 @@ func RandomPort(protocol string) uint16 {
 				ports.usingPorts.Store(port, protocols{kcp: true})
 			case "tcp":
 				ports.usingPorts.Store(port, protocols{tcp: true})
+			case "quic":
+				ports.usingPorts.Store(port, protocols{quic: true})
 			default:
 				ports.writeMutex.Unlock()
-				log.Error("not support ", protocol, ", please use tcp/kcp/udp.")
+				log.Error("not support ", protocol, ", please use tcp/kcp/udp/quic.")
 				return 0
 			}
 			ports.writeMutex.Unlock()

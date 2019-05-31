@@ -5,6 +5,7 @@
     "RandomPortRange": 10000,
     "UPort":6008,
     "KPort":6008,
-    "LogDir":"./"
+    "LogDir":"./",
+    "QPort":6008
   }
 }

@@ -12,6 +12,7 @@ import (
 	udpProxy "github.com/saveio/porter/proxy/udp"
 	"github.com/saveio/themis/common/log"
 	"os"
+	quicProxy "github.com/saveio/porter/proxy/quic"
 )
 
 func main() {
@@ -23,6 +24,8 @@ func main() {
 		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
 	case "kcp":
 		kcpProxy.Init().StartKCPServer(uint16(common.GetPortFromParamsByProtocol("kcp")))
+	case "quic":
+		quicProxy.Init().StartKCPServer(uint16(common.GetPortFromParamsByProtocol("quic")))
 	default:
 		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
 		kcpProxy.Init().StartKCPServer(uint16(common.GetPortFromParamsByProtocol("kcp")))
