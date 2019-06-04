@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const writeFLushLatency = 50 * time.Millisecond
+const writeFLushLatency = 10 * time.Millisecond
 
 func flushLoop(state *ConnState) {
 	t := time.NewTicker(writeFLushLatency)
