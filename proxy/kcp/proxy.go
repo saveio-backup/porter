@@ -69,6 +69,7 @@ func (p *KcpProxyServer) proxyAccept(peerInfo peer) error {
 			for {
 				buffer, _ := receiveKCPRawMessage(connState)
 				transferKCPRawMessage(buffer, peerInfo.state)
+				log.Info("proxy transfer date from (proxy server): ", peerInfo.listener.Addr().String()," to: ", peerInfo.state.conn.RemoteAddr().String())
 			}
 		}()
 	}
