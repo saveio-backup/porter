@@ -20,7 +20,7 @@ func (p *QuicProxyServer) startListenScheduler() {
 			var proxyIP string
 
 			proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
-			//log.Info(fmt.Sprintf("origin (%s) relay ip is: %s", message.Sender.Address, proxyIP))
+			log.Info(fmt.Sprintf("origin (%s) relay ip is: %s", item.connectionID, proxyIP))
 			sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
 
 /*			peerInfo, ok := p.proxies.Load(item.connectionID)
