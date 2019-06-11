@@ -19,7 +19,7 @@ import (
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
 
-func receiveKCPRawMessage(state *ConnState) ([]byte, error) {
+func receiveQuicRawMessage(state *ConnState) ([]byte, error) {
 	var err error
 	var size uint32
 	// Read until all header bytes have been read.
@@ -143,7 +143,7 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	return nil
 }
 
-func transferKCPRawMessage(message []byte, state *ConnState) error {
+func transferQuicRawMessage(message []byte, state *ConnState) error {
 	totalSize := len(message)
 
 	// Write until all bytes have been written.

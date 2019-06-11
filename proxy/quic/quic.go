@@ -55,7 +55,7 @@ type peerListen struct {
 	state        *ConnState
 }
 
-type KcpProxyServer struct {
+type QuicProxyServer struct {
 	mainListener   quic.Listener
 	proxies        *sync.Map
 	ports          port
@@ -75,8 +75,8 @@ func init() {
 	mRand.Seed(time.Now().UnixNano())
 }
 
-func Init() *KcpProxyServer {
-	return &KcpProxyServer{
+func Init() *QuicProxyServer {
+	return &QuicProxyServer{
 		proxies:        new(sync.Map),
 		msgBuffer:      make(chan msgNotify, MESSAGE_CHANNEL_LEN),
 		listenerBuffer: make(chan peerListen, LISTEN_CHANNEL_LEN),
@@ -126,7 +126,7 @@ func listen(ip string, port uint16) (quic.Listener, error) {
 	return listener, nil
 }
 
-func (p *KcpProxyServer) kcpServerListenAndAccept(ip string, port uint16) {
+func (p *QuicProxyServer) quicServerListenAndAccept(ip string, port uint16) {
 	var err error
 	p.mainListener, err = listen(ip, port)
 	if err != nil {
@@ -139,11 +139,11 @@ func (p *KcpProxyServer) kcpServerListenAndAccept(ip string, port uint16) {
 	go p.startListenScheduler()
 }
 
-func (p *KcpProxyServer) serverAccept() error {
+func (p *QuicProxyServer) serverAccept() error {
 	for {
 		conn, err := p.mainListener.Accept()
 		if err != nil {
-			log.Error("kcp listener accept error:", err.Error())
+			log.Error("quic listener accept error:", err.Error())
 		}
 		stream, err:= conn.AcceptStream()
 		go func() {
@@ -160,7 +160,7 @@ func (p *KcpProxyServer) serverAccept() error {
 	return nil
 }
 
-func (p *KcpProxyServer) monitorPeerStatus() {
+func (p *QuicProxyServer) monitorPeerStatus() {
 	interval := time.Tick(MONITOR_TIME_INTERVAL * time.Second)
 	for {
 		select {
@@ -176,7 +176,7 @@ func (p *KcpProxyServer) monitorPeerStatus() {
 	}
 }
 
-func (p *KcpProxyServer) StartKCPServer(port uint16) {
+func (p *QuicProxyServer) StartQuicServer(port uint16) {
 	go p.monitorPeerStatus()
-	go p.kcpServerListenAndAccept(common.GetLocalIP(), port)
+	go p.quicServerListenAndAccept(common.GetLocalIP(), port)
 }

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func (p *KcpProxyServer) startListenScheduler() {
+func (p *QuicProxyServer) startListenScheduler() {
 	for {
 		select {
 		case item := <-p.listenerBuffer:
@@ -37,7 +37,7 @@ func (p *KcpProxyServer) startListenScheduler() {
 	}
 }
 
-func (p *KcpProxyServer) proxyListenAndAccept(ConnectionID string, state *ConnState) string {
+func (p *QuicProxyServer) proxyListenAndAccept(ConnectionID string, state *ConnState) string {
 	port := common.RandomPort("quic")
 	listener, err := listen(common.GetLocalIP(), port)
 	if err != nil {
@@ -45,7 +45,7 @@ func (p *KcpProxyServer) proxyListenAndAccept(ConnectionID string, state *ConnSt
 		return ""
 	}
 
-	peerInfo := peer{addr: fmt.Sprintf("kcp://%s:%d", common.GetLocalIP(), port),
+	peerInfo := peer{addr: fmt.Sprintf("quic://%s:%d", common.GetLocalIP(), port),
 		state:      state,
 		conn:       state.conn,
 		listener:   listener,
@@ -59,7 +59,7 @@ func (p *KcpProxyServer) proxyListenAndAccept(ConnectionID string, state *ConnSt
 	return fmt.Sprintf("%s:%d", common.GetPublicIP(), port)
 }
 
-func (p *KcpProxyServer) proxyAccept(peerInfo peer) error {
+func (p *QuicProxyServer) proxyAccept(peerInfo peer) error {
 	for {
 		conn, err := peerInfo.listener.Accept()
 		if err != nil {
@@ -73,8 +73,8 @@ func (p *KcpProxyServer) proxyAccept(peerInfo peer) error {
 			connState := newConnState(stream)
 			close(connState.stop) //connState.stop没有使用，可以立刻关闭;
 			for {
-				buffer, _ := receiveKCPRawMessage(connState)
-				transferKCPRawMessage(buffer, peerInfo.state)
+				buffer, _ := receiveQuicRawMessage(connState)
+				transferQuicRawMessage(buffer, peerInfo.state)
 			}
 		}()
 	}

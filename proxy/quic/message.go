@@ -32,7 +32,7 @@ func flushLoop(state *ConnState) {
 	}
 }
 
-func (p *KcpProxyServer) releasePeerResource(ConnectionID string) {
+func (p *QuicProxyServer) releasePeerResource(ConnectionID string) {
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
 		close(peerInfo.(peer).stop)
 		close(peerInfo.(peer).state.stop)
@@ -42,7 +42,7 @@ func (p *KcpProxyServer) releasePeerResource(ConnectionID string) {
 	}
 }
 
-func (p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, state *ConnState) {
+func (p *QuicProxyServer) handleProxyRequestMessage(message *protobuf.Message, state *ConnState) {
 
 	//if the client is working in public-net environment, return ip address directly
 /*	if message.Sender.Address == state.conn.RemoteAddr().String() {
@@ -60,7 +60,7 @@ func (p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, st
 	go flushLoop(state)
 }
 
-func (p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState) {
+func (p *QuicProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState) {
 	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
 		p.proxies.Delete(ConnectionID)
@@ -77,12 +77,12 @@ func (p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 	}
 }
 
-func (p *KcpProxyServer) handleDisconnectMessage(message *protobuf.Message) {
+func (p *QuicProxyServer) handleDisconnectMessage(message *protobuf.Message) {
 	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
 	p.releasePeerResource(ConnectionID)
 }
 
-func (p *KcpProxyServer) handleControlMessage() {
+func (p *QuicProxyServer) handleControlMessage() {
 	for {
 		select {
 		case item := <-p.msgBuffer:
