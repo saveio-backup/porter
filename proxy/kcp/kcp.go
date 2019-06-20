@@ -16,6 +16,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"encoding/hex"
 )
 
 const (
@@ -104,7 +105,7 @@ func (p *KcpProxyServer) kcpServerListenAndAccept(ip string, port uint16) {
 	var err error
 	p.mainListener, err = listen(ip, port)
 	if err != nil {
-		log.Errorf("kcp server listen start ERROR:", err.Error())
+		log.Errorf("kcp server listen start ERROR:", err.Error(), "listen(IP/PORT):%s,%d",ip,port)
 	} else {
 		log.Info("Kcp Proxy Listen IP:", p.mainListener.Addr().String())
 	}
@@ -118,11 +119,14 @@ func (p *KcpProxyServer) serverAccept() error {
 		conn, err := p.mainListener.Accept()
 		if err != nil {
 			log.Error("kcp listener accept error:", err.Error())
+		}else {
+			log.Info("Kcp main listener accept a client connection, client-addr:",conn.RemoteAddr().String())
 		}
 		go func() {
 			connState := newConnState(conn)
 			for {
 				message, err := receiveMessage(connState)
+				log.Infof("accept kcp connection(remote addr:%s) receive a message, message.opcode:%d,message.Sender.Addr:%s, message.sign:%s",conn.RemoteAddr().String(), message.Opcode, message.Sender.Address, hex.EncodeToString(message.Signature))
 				if nil == message || err != nil {
 					break
 				}
@@ -141,7 +145,7 @@ func (p *KcpProxyServer) monitorPeerStatus() {
 			p.proxies.Range(func(key, value interface{}) bool {
 				if time.Now().After(value.(peer).updateTime.Add(PEER_MONITOR_TIMEOUT)) {
 					p.releasePeerResource(key.(string))
-					log.Info("client has disconnect from proxy server, peerID:", key.(string))
+					log.Info("monitor timeout, proxy service release, peerID:", key.(string))
 				}
 				return true
 			})

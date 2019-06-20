@@ -10,11 +10,14 @@ import (
 	"github.com/saveio/porter/common"
 	kcpProxy "github.com/saveio/porter/proxy/kcp"
 	udpProxy "github.com/saveio/porter/proxy/udp"
+	"github.com/saveio/themis/common/log"
+	"os"
 )
 
 func main() {
 	protocol := flag.String("protocol", "", "protocol to use (kcp/tcp/udp)")
 	flag.Parse()
+	log.InitLog(log.InfoLog,common.GetLogDir(),os.Stdout)
 	switch *protocol {
 	case "udp":
 		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))

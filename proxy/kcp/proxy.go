@@ -39,7 +39,7 @@ func (p *KcpProxyServer) proxyListenAndAccept(ConnectionID string, state *ConnSt
 		log.Error("proxy listen server start ERROR:", err.Error())
 		return ""
 	}
-
+	log.Infof("building proxy listen for:%s, proxy addr:%s:%d",state.conn.RemoteAddr(), common.GetPublicIP(),port)
 	peerInfo := peer{addr: fmt.Sprintf("kcp://%s:%d", common.GetLocalIP(), port),
 		state:      state,
 		conn:       state.conn,
@@ -61,15 +61,20 @@ func (p *KcpProxyServer) proxyAccept(peerInfo peer) error {
 			log.Error("peer proxy accept err:", err.Error())
 			continue
 		}
-
+		log.Info("There is a new coming connection(coming-addr:%s) belong to listen-addr:%s",conn.RemoteAddr().String(), peerInfo.addr)
 		go func() {
 			defer conn.Close()
 			connState := newConnState(conn)
 			close(connState.stop) //connState.stop没有使用，可以立刻关闭;
 			for {
-				buffer, _ := receiveKCPRawMessage(connState)
-				transferKCPRawMessage(buffer, peerInfo.state)
-				log.Info("proxy transfer date from (proxy server): ", peerInfo.listener.Addr().String()," to: ", peerInfo.state.conn.RemoteAddr().String())
+				select {
+				default:
+					buffer, _ := receiveKCPRawMessage(connState)
+					transferKCPRawMessage(buffer, peerInfo.state)
+					log.Info("proxy transfer date finished, from (proxy server): ", peerInfo.listener.Addr().String()," to: ", peerInfo.state.conn.RemoteAddr().String())
+				case <-peerInfo.state.stop:
+					return
+				}
 			}
 		}()
 	}

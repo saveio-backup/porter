@@ -40,6 +40,7 @@ func (p *KcpProxyServer) releasePeerResource(ConnectionID string) {
 		peerInfo.(peer).conn.Close()
 		peerInfo.(peer).state.conn.Close()
 		p.proxies.Delete(ConnectionID)
+		log.Info("release proxy service for connectionID:", ConnectionID)
 	}
 }
 
@@ -52,6 +53,7 @@ func (p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, st
 			log.Error("parse remoteAddr err:", err.Error())
 			return
 		}
+		log.Infof("remote node is working in public-net env, return ip address directly. addr:%s",message.Sender.Address)
 		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress: addrInfo.ToString()})
 		return
 	}
@@ -80,6 +82,7 @@ func (p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 
 func (p *KcpProxyServer) handleDisconnectMessage(message *protobuf.Message) {
 	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
+	log.Info("kcp receive disconnect signal ,connectionID:", ConnectionID)
 	p.releasePeerResource(ConnectionID)
 }
 

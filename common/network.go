@@ -51,3 +51,7 @@ func GetPortFromParamsByProtocol(protocol string) int {
 func GetPublicHost(protocol string) string {
 	return fmt.Sprintf("%s://%s:%d", protocol, GetPublicIP(), GetPortFromParamsByProtocol(protocol))
 }
+
+func GetLogDir() string {
+	return Parameters.LogDir
+}

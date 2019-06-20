@@ -25,6 +25,7 @@ type Configuration struct {
 	RandomPortRange int    `json:"RandomPortRange"`
 	UPort           int    `json:"UPort"`
 	KPort           int    `json:"KPort"`
+	LogDir			string	`json:"LogDir"`
 }
 
 type ConfigFile struct {

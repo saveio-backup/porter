@@ -14,6 +14,7 @@ import (
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
 	"sync/atomic"
+	"encoding/hex"
 )
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
@@ -38,7 +39,13 @@ func receiveKCPRawMessage(state *ConnState) ([]byte, error) {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		totalBytesRead += bytesRead
 	}
-
+	// Deserialize message.
+	msg := new(protobuf.Message)
+	err = proto.Unmarshal(buffer, msg)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal message")
+	}
+	log.Infof("receive kcp coming message, which will be transfer directly, message.opcode:%d, message.signature:%s, message.addr:%s",msg.Opcode,hex.EncodeToString(msg.Signature), msg.Sender.Address)
 	return append(sizeBuf, buffer...), nil
 }
 
