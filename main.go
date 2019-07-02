@@ -13,8 +13,6 @@ import (
 	"github.com/saveio/themis/common/log"
 	"os"
 	quicProxy "github.com/saveio/porter/proxy/quic"
-	"github.com/saveio/themis/common/log"
-	"os"
 )
 
 func main() {

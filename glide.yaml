@@ -1,0 +1,4 @@
+package: github.com/saveio/porter
+import:
+- package: github.com/lucas-clemente/quic-go
+  vcs: git
