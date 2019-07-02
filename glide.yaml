@@ -1,4 +1,15 @@
 package: github.com/saveio/porter
 import:
+- package: github.com/golang/protobuf
+  version: ^1.3.1
+  subpackages:
+  - proto
 - package: github.com/lucas-clemente/quic-go
-  vcs: git
+  version: ^0.11.2
+- package: github.com/pkg/errors
+  version: ^0.8.1
+- package: github.com/saveio/themis
+  subpackages:
+  - common/log
+- package: github.com/xtaci/kcp-go
+  version: ^5.4.2
