@@ -10,7 +10,7 @@ help:          ## Show available options with this Makefile
 	@grep -F -h "##" $(MAKEFILE_LIST) | grep -v grep | awk 'BEGIN { FS = ":.*?##" }; { printf "%-15s  %s\n", $$1,$$2 }'
 
 .PHONY: build
-build:
+build: clean
 	$(GC) -o porter main.go
 
 .PHONY: glide

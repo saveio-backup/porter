@@ -29,6 +29,7 @@ func main() {
 	default:
 		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
 		kcpProxy.Init().StartKCPServer(uint16(common.GetPortFromParamsByProtocol("kcp")))
+		quicProxy.Init().StartQuicServer(uint16(common.GetPortFromParamsByProtocol("quic")))
 	}
 	select {}
 }
