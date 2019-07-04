@@ -119,6 +119,7 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	bytesWritten, totalBytesWritten := 0, 0
 
 	state.writerMutex.Lock()
+	defer state.writerMutex.Unlock()
 
 	//bw, isBuffered := w.(*bufio.Writer)
 	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
@@ -130,12 +131,11 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	for totalBytesWritten < len(buffer) && err == nil {
 		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
 		if err != nil {
-			log.Errorf("stream: failed to write entire buffer, err: %+v", err)
+			log.Errorf("stream(common): failed to write entire buffer, err: %+v", err)
 		}
 		totalBytesWritten += bytesWritten
 	}
 
-	state.writerMutex.Unlock()
 	if err != nil {
 		return errors.Wrap(err, "stream: failed to write to socket")
 	}
@@ -150,6 +150,7 @@ func transferQuicRawMessage(message []byte, state *ConnState) error {
 	bytesWritten, totalBytesWritten := 0, 0
 
 	state.writerMutex.Lock()
+	defer state.writerMutex.Unlock()
 
 	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
 		if err := state.writer.Flush(); err != nil {
@@ -160,11 +161,10 @@ func transferQuicRawMessage(message []byte, state *ConnState) error {
 	for totalBytesWritten < len(message) && err == nil {
 		bytesWritten, err = state.writer.Write(message[totalBytesWritten:])
 		if err != nil {
-			log.Errorf("stream: failed to write entire buffer, err: %+v", err)
+			log.Errorf("stream(raw): failed to write entire buffer, err: %+v", err)
 		}
 		totalBytesWritten += bytesWritten
 	}
-	state.writerMutex.Unlock()
 
 	if err != nil {
 		return errors.Wrap(err, "stream: failed to write to socket")
