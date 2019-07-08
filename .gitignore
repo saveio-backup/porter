@@ -3,3 +3,4 @@ internal/protobuf/gen_pb
 main
 porter
 vendor/
+*.log

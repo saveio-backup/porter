@@ -44,6 +44,8 @@ func GetPortFromParamsByProtocol(protocol string) int {
 		return Parameters.KPort
 	case "quic":
 		return Parameters.QPort
+	case "tcp":
+		return Parameters.TPort
 	default:
 		log.Error("please use correct protocol, kcp or udp. not support:", protocol)
 		return -1

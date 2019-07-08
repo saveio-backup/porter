@@ -3,7 +3,7 @@
  * Author: Yihen.Liu
  * Create: 2019-05-30
  */
-package quic
+package kcp
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func (p *QuicProxyServer) startListenScheduler() {
+func (p *TCPProxyServer) startListenScheduler() {
 	for {
 		select {
 		case item := <-p.listenerBuffer:
@@ -37,15 +37,15 @@ func (p *QuicProxyServer) startListenScheduler() {
 	}
 }
 
-func (p *QuicProxyServer) proxyListenAndAccept(ConnectionID string, state *ConnState) string {
-	port := common.RandomPort("quic")
+func (p *TCPProxyServer) proxyListenAndAccept(ConnectionID string, state *ConnState) string {
+	port := common.RandomPort("tcp")
 	listener, err := listen(common.GetLocalIP(), port)
 	if err != nil {
 		log.Error("proxy listen server start ERROR:", err.Error())
 		return ""
 	}
 
-	peerInfo := peer{addr: fmt.Sprintf("quic://%s:%d", common.GetLocalIP(), port),
+	peerInfo := peer{addr: fmt.Sprintf("tcp://%s:%d", common.GetLocalIP(), port),
 		state:      state,
 		conn:       state.conn,
 		listener:   listener,
@@ -59,26 +59,26 @@ func (p *QuicProxyServer) proxyListenAndAccept(ConnectionID string, state *ConnS
 	return fmt.Sprintf("%s:%d", common.GetPublicIP(), port)
 }
 
-func (p *QuicProxyServer) proxyAccept(peerInfo peer) error {
+func (p *TCPProxyServer) proxyAccept(peerInfo peer) error {
 	for {
 		conn, err := peerInfo.listener.Accept()
 		if err != nil {
 			log.Error("peer proxy accept err:", err.Error())
 			continue
 		}
-		stream, err:= conn.AcceptStream()
+		//stream, err:= conn.AcceptStream()
 		go func() {
 			defer conn.Close()
-			defer stream.Close()
-			connState := newConnState(stream)
+			//defer stream.Close()
+			connState := newConnState(conn)
 			close(connState.stop) //connState.stop没有使用，可以立刻关闭;
 			for {
 				select {
 				case <-peerInfo.state.stop:
 					return
 				default:
-					buffer, _ := receiveQuicRawMessage(connState)
-					transferQuicRawMessage(buffer, peerInfo.state)
+					buffer, _ := receiveTcpRawMessage(connState)
+					transferTcpRawMessage(buffer, peerInfo.state)
 				}
 			}
 		}()

@@ -1,11 +1,12 @@
 {
   "Configuration":{
-    "PublicIP": "192.168.1.115",
+    "PublicIP": "192.168.1.5",
     "RandomPortBegin": 55535,
     "RandomPortRange": 10000,
     "UPort":6008,
     "KPort":6008,
     "QPort":6008,
+    "TPort":6008,
     "LogDir":"./"
   }
 }

@@ -27,6 +27,7 @@ type Configuration struct {
 	KPort           int    `json:"KPort"`
 	LogDir			string	`json:"LogDir"`
 	QPort           int    `json:"QPort"`
+	TPort           int    `json:"TPort"`
 }
 
 type ConfigFile struct {
