@@ -25,6 +25,7 @@ vendor: glide.yaml glide.lock
 clean:
 	rm -rf porter
 	rm -rf build/
+	rm -rf *.log
 
 .PHONY: pb
 pb:

@@ -162,6 +162,7 @@ func transferQuicRawMessage(message []byte, state *ConnState) error {
 		bytesWritten, err = state.writer.Write(message[totalBytesWritten:])
 		if err != nil {
 			log.Errorf("stream(raw): failed to write entire buffer, err: %+v", err)
+			return err
 		}
 		totalBytesWritten += bytesWritten
 	}

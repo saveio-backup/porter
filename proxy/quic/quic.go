@@ -69,6 +69,8 @@ type ConnState struct {
 	messageNonce uint64
 	writerMutex  *sync.Mutex
 	stop         chan struct{}
+	connectionID string
+	remoteAddr   string
 }
 
 func init() {
@@ -83,13 +85,14 @@ func Init() *QuicProxyServer {
 	}
 }
 
-func newConnState(listenr quic.Stream) *ConnState {
+func newConnState(listenr quic.Stream, addr string) *ConnState {
 	return &ConnState{
 		conn:         listenr,
 		writer:       bufio.NewWriterSize(listenr, defaultRecvBufferSize),
 		messageNonce: 0,
 		writerMutex:  new(sync.Mutex),
 		stop:         make(chan struct{}),
+		remoteAddr:	  addr,
 	}
 }
 
@@ -117,7 +120,7 @@ func generateTLSConfig() *tls.Config {
 // Listen listens for incoming UDP connections on a specified port.
 func listen(ip string, port uint16) (quic.Listener, error) {
 	resolved := fmt.Sprintf("%s:%d", ip, port)
-	listener, err := quic.ListenAddr(resolved, generateTLSConfig(), nil)
+	listener, err := quic.ListenAddr(resolved, generateTLSConfig(), &quic.Config{KeepAlive: true, IdleTimeout: time.Second * 3})
 
 	if err != nil {
 		return nil, err
@@ -143,19 +146,23 @@ func (p *QuicProxyServer) serverAccept() error {
 	for {
 		conn, err := p.mainListener.Accept()
 		if err != nil {
-			log.Error("quic listener accept error:", err.Error())
+			log.Error("quic listener accept error:", err.Error(), "listen addr:", p.mainListener.Addr().String())
 		}
 		stream, err:= conn.AcceptStream()
-		go func() {
-			connState := newConnState(stream)
+		if err!=nil{
+			log.Error("quic accept stream err:", err.Error(), "listen addr:",p.mainListener.Addr().String())
+		}
+		go func(stream quic.Stream, conn quic.Session) {
+			connState := newConnState(stream,conn.RemoteAddr().String())
 			for {
 				message, err := receiveMessage(connState)
 				if nil == message || err != nil {
+					log.Error("quic receive message goroutine err:", err.Error(), "listen addr:",p.mainListener.Addr().String())
 					break
 				}
 				p.msgBuffer <- msgNotify{message: message, state: connState}
 			}
-		}()
+		}(stream,conn)
 	}
 	return nil
 }
