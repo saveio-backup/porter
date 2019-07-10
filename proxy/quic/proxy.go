@@ -19,24 +19,14 @@ func (p *QuicProxyServer) startListenScheduler() {
 		select {
 		case item := <-p.listenerBuffer:
 			var proxyIP string
-
-		if _, ok:=p.proxies.Load(item.connectionID);!ok{
-			proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
-			sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
-		}else{
-			log.Info(fmt.Sprintf("(quic) origin (%s) relay ip is: %s, has exist.", item.connectionID, proxyIP))
-		}
-
-/*			peerInfo, ok := p.proxies.Load(item.connectionID)
-			if !ok {
-				proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
-				//log.Info(fmt.Sprintf("origin (%s) relay ip is: %s", message.Sender.Address, proxyIP))
-				sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
-			} else if peerInfo.(peer).addr != item.state.conn.RemoteAddr().String() {
-				p.proxies.Delete(item.connectionID)
+			if _, ok:=p.proxies.Load(item.connectionID);!ok{
 				proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
 				sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
-			}*/
+			}else{
+				log.Info(fmt.Sprintf("(quic) origin (%s) relay ip is: %s, has exist.", item.connectionID, proxyIP))
+			}
+		case <-p.stop:
+			return
 		}
 	}
 }
@@ -65,35 +55,52 @@ func (p *QuicProxyServer) proxyListenAndAccept(connectionID string, state *ConnS
 	return fmt.Sprintf("%s:%d", common.GetPublicIP(), port)
 }
 
-func (p *QuicProxyServer) proxyAccept(peerInfo peer, connectionID string) error {
-	for {
-		conn, err := peerInfo.listener.Accept()
-		if err != nil {
-			log.Error("peer proxy accept err:", err.Error(), "listen ip", peerInfo.listener.Addr().String())
-			continue
-		}
-		stream, err:= conn.AcceptStream()
-		go func(stream quic.Stream, conn quic.Session) {
-			defer stream.Close()
-			defer conn.Close()
-			//defer p.releasePeerResource(connectionID); 不要releasePeerResource， 只释放掉出问题的连接即可，不要释放无关连接；
-			connState := newConnState(stream,"")
-			close(connState.stop) //connState.stop没有使用，可以立刻关闭;
-			for {
-				select {
-				case <-peerInfo.state.stop:
-					log.Info("groutine exit, listen ip is ", peerInfo.listener.Addr().String())
+func(p *QuicProxyServer) onceAccept(peerInfo peer, connectionID string) error{
+	conn, err := peerInfo.listener.Accept()
+	if err != nil {
+		log.Error("peer proxy accept err:", err.Error(), "listen ip", peerInfo.listener.Addr().String())
+		return err
+	}
+	stream, err:= conn.AcceptStream()
+	go func(stream quic.Stream, conn quic.Session) {
+		defer stream.Close()
+		defer conn.Close()
+		//defer p.releasePeerResource(connectionID) //不要releasePeerResource， 只释放掉出问题的连接即可，不要释放无关连接；
+		connState := newConnState(stream,"")
+		close(connState.stop) //connState.stop没有使用，可以立刻关闭;
+		for {
+			select {
+			case <-peerInfo.state.stop:
+				log.Info("goroutine exit, listen ip is ", peerInfo.listener.Addr().String())
+				return
+			default:
+				buffer, err := receiveQuicRawMessage(connState)
+				if 0 == len(buffer) || nil == buffer{
+					log.Error("(quic) onceAccept groutine, receive empty message")
 					return
-				default:
-					buffer, _ := receiveQuicRawMessage(connState)
-					err := transferQuicRawMessage(buffer, peerInfo.state)
-					if err!=nil {
-						log.Error("transfer quic raw message err:", err.Error(),"addr:", peerInfo.listener.Addr().String())
-						return
-					}
+				}
+				err = transferQuicRawMessage(buffer, peerInfo.state)
+				if err!=nil {
+					log.Error("transfer quic raw message err:", err.Error(),"addr:", peerInfo.listener.Addr().String())
+					return
 				}
 			}
-		}(stream, conn)
+		}
+	}(stream, conn)
+	return nil
+}
+
+func (p *QuicProxyServer) proxyAccept(peerInfo peer, connectionID string) error {
+	for {
+		select {
+		case <-peerInfo.stop:
+			log.Info("peerInfo receive stop signal, exit now.")
+			return nil
+		default:
+			if err:= p.onceAccept(peerInfo, connectionID); err!=nil{
+				return err
+			}
+		}
 	}
 	return nil
 }

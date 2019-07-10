@@ -31,7 +31,8 @@ func flushLoop(state *ConnState) {
 	defer t.Stop()
 	for {
 		select {
-		case <-state.stop:
+		case<-state.stop:
+			log.Info("flush loop receive stop signal.")
 			flushOnce(state)
 			return
 		case <-t.C:
@@ -46,6 +47,8 @@ func flushLoop(state *ConnState) {
 
 func (p *QuicProxyServer) releasePeerResource(ConnectionID string) {
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
+		log.Info("release peer resource, connectionID:", ConnectionID)
+
 		close(peerInfo.(peer).stop)
 		close(peerInfo.(peer).state.stop)
 		peerInfo.(peer).conn.Close()
@@ -109,6 +112,8 @@ func (p *QuicProxyServer) handleControlMessage() {
 			default:
 				//log.Warn("please send correct control message type, include ProxyRequest/Keepalive/Disconnect, message.opcode:", item.message.Opcode, "send to ip:",item.message.Sender.Address)
 			}
+		case <-p.stop:
+			return
 		}
 	}
 }

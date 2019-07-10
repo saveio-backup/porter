@@ -61,6 +61,7 @@ type QuicProxyServer struct {
 	ports          port
 	msgBuffer      chan msgNotify
 	listenerBuffer chan peerListen
+	stop 			chan struct{}
 }
 
 type ConnState struct {
@@ -82,6 +83,7 @@ func Init() *QuicProxyServer {
 		proxies:        new(sync.Map),
 		msgBuffer:      make(chan msgNotify, MESSAGE_CHANNEL_LEN),
 		listenerBuffer: make(chan peerListen, LISTEN_CHANNEL_LEN),
+		stop:			make(chan struct{}),
 	}
 }
 
@@ -157,13 +159,15 @@ func (p *QuicProxyServer) serverAccept() error {
 			for {
 				message, err := receiveMessage(connState)
 				if nil == message || err != nil {
-					log.Error("quic receive message goroutine err:", err.Error(), "listen addr:",p.mainListener.Addr().String())
+					log.Error("quic receive message goroutine err:", err.Error(), "listen remote addr:",conn.RemoteAddr().String())
+					p.releasePeerResource(connState.connectionID)
 					break
 				}
 				p.msgBuffer <- msgNotify{message: message, state: connState}
 			}
 		}(stream,conn)
 	}
+	close(p.stop)
 	return nil
 }
 

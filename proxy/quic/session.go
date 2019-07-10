@@ -31,6 +31,9 @@ func receiveQuicRawMessage(state *ConnState) ([]byte, error) {
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
 		totalBytesRead += bytesRead
 	}
+	if err!=nil{
+		return nil,err
+	}
 	size = binary.BigEndian.Uint32(sizeBuf)
 	buffer := make([]byte, size)
 
@@ -39,9 +42,15 @@ func receiveQuicRawMessage(state *ConnState) ([]byte, error) {
 	for totalBytesRead < int(size) && err == nil {
 		//bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
+		if err!=nil{
+			return nil, err
+		}
 		totalBytesRead += bytesRead
 	}
-
+	if err!=nil{
+		return nil, err
+	}
+	totalBytesRead += bytesRead
 	return append(sizeBuf, buffer...), nil
 }
 
@@ -145,7 +154,9 @@ func sendMessage(state *ConnState, message proto.Message) error {
 
 func transferQuicRawMessage(message []byte, state *ConnState) error {
 	totalSize := len(message)
-
+	if totalSize == 0{
+		return errors.New("in transferQuicRawMessage, will send empty message")
+	}
 	// Write until all bytes have been written.
 	bytesWritten, totalBytesWritten := 0, 0
 
