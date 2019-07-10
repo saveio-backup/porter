@@ -3,7 +3,7 @@
  * Author: Yihen.Liu
  * Create: 2019-04-26
  */
-package kcp
+package tcp
 
 import (
 	"bufio"
@@ -55,6 +55,7 @@ type TCPProxyServer struct {
 	ports          port
 	msgBuffer      chan msgNotify
 	listenerBuffer chan peerListen
+	stop 			chan struct{}
 }
 
 type ConnState struct {
@@ -63,6 +64,8 @@ type ConnState struct {
 	messageNonce uint64
 	writerMutex  *sync.Mutex
 	stop         chan struct{}
+	connectionID string
+	remoteAddr   string
 }
 
 func init() {
@@ -74,16 +77,18 @@ func Init() *TCPProxyServer {
 		proxies:        new(sync.Map),
 		msgBuffer:      make(chan msgNotify, MESSAGE_CHANNEL_LEN),
 		listenerBuffer: make(chan peerListen, LISTEN_CHANNEL_LEN),
+		stop:			make(chan struct{}),
 	}
 }
 
-func newConnState(listenr net.Conn) *ConnState {
+func newConnState(listenr net.Conn, addr string) *ConnState {
 	return &ConnState{
 		conn:         listenr,
 		writer:       bufio.NewWriterSize(listenr, defaultRecvBufferSize),
 		messageNonce: 0,
 		writerMutex:  new(sync.Mutex),
 		stop:         make(chan struct{}),
+		remoteAddr:	  addr,
 	}
 }
 
@@ -116,20 +121,22 @@ func (p *TCPProxyServer) serverAccept() error {
 	for {
 		conn, err := p.mainListener.Accept()
 		if err != nil {
-			log.Error("tcp listener accept error:", err.Error())
+			log.Error("tcp listener accept error:", err.Error(), "listen addr:", p.mainListener.Addr().String())
 		}
-		//stream, err:= conn.AcceptStream()
-		go func() {
-			connState := newConnState(conn)
+		go func(conn net.Conn) {
+			connState := newConnState(conn,conn.RemoteAddr().String())
 			for {
 				message, err := receiveMessage(connState)
 				if nil == message || err != nil {
+					log.Error("tcp receive message goroutine err:", err.Error(), "listen remote addr:",conn.RemoteAddr().String())
+					p.releasePeerResource(connState.connectionID)
 					break
 				}
 				p.msgBuffer <- msgNotify{message: message, state: connState}
 			}
-		}()
+		}(conn)
 	}
+	close(p.stop)
 	return nil
 }
 

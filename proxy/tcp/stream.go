@@ -3,7 +3,7 @@
  * Author: Yihen.Liu
  * Create: 2019-04-26
  */
-package kcp
+package tcp
 
 import (
 	"encoding/binary"
@@ -31,6 +31,9 @@ func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
 		totalBytesRead += bytesRead
 	}
+	if err!=nil{
+		return nil,err
+	}
 	size = binary.BigEndian.Uint32(sizeBuf)
 	buffer := make([]byte, size)
 
@@ -39,9 +42,15 @@ func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
 	for totalBytesRead < int(size) && err == nil {
 		//bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
+		if err!=nil{
+			return nil, err
+		}
 		totalBytesRead += bytesRead
 	}
-
+	if err!=nil{
+		return nil, err
+	}
+	totalBytesRead += bytesRead
 	return append(sizeBuf, buffer...), nil
 }
 
@@ -131,13 +140,13 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	for totalBytesWritten < len(buffer) && err == nil {
 		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
 		if err != nil {
-			log.Errorf("stream(common): failed to write entire buffer, err: %+v", err)
+			log.Errorf("tcp stream(common): failed to write entire buffer, err: %+v", err)
 		}
 		totalBytesWritten += bytesWritten
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "stream: failed to write to socket")
+		return errors.Wrap(err, "tcp stream: failed to write to socket")
 	}
 
 	return nil
@@ -145,7 +154,9 @@ func sendMessage(state *ConnState, message proto.Message) error {
 
 func transferTcpRawMessage(message []byte, state *ConnState) error {
 	totalSize := len(message)
-
+	if totalSize == 0{
+		return errors.New("in transferTCPRawMessage, will send empty message")
+	}
 	// Write until all bytes have been written.
 	bytesWritten, totalBytesWritten := 0, 0
 
@@ -161,13 +172,14 @@ func transferTcpRawMessage(message []byte, state *ConnState) error {
 	for totalBytesWritten < len(message) && err == nil {
 		bytesWritten, err = state.writer.Write(message[totalBytesWritten:])
 		if err != nil {
-			log.Errorf("stream(raw): failed to write entire buffer, err: %+v", err)
+			log.Errorf("tcp stream(raw): failed to write entire buffer, err: %+v", err)
+			return err
 		}
 		totalBytesWritten += bytesWritten
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "stream: failed to write to socket")
+		return errors.Wrap(err, "(tcp) stream: failed to write to socket")
 	}
 
 	return nil

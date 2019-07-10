@@ -3,7 +3,7 @@
  * Author: Yihen.Liu
  * Create: 2019-05-09
  */
-package kcp
+package tcp
 
 import (
 	"encoding/hex"
@@ -15,25 +15,39 @@ import (
 
 const writeFLushLatency = 50 * time.Millisecond
 
+func flushOnce(state *ConnState) error {
+	state.writerMutex.Lock()
+	if err := state.writer.Flush(); err != nil {
+		log.Errorf("tcp flush err: %+v", err)
+		state.writerMutex.Unlock()
+		return err
+	}
+	state.writerMutex.Unlock()
+	return nil
+}
+
 func flushLoop(state *ConnState) {
 	t := time.NewTicker(writeFLushLatency)
 	defer t.Stop()
 	for {
 		select {
-		case <-state.stop:
+		case<-state.stop:
+			log.Info("tcp flush loop receive stop signal.")
+			flushOnce(state)
 			return
 		case <-t.C:
-			state.writerMutex.Lock()
-			if err := state.writer.Flush(); err != nil {
-				log.Errorf("flush err: %+v", err)
+			err := flushOnce(state)
+			if err!=nil{
+				log.Error("(tcp) flush loop err:", err.Error())
+				return
 			}
-			state.writerMutex.Unlock()
 		}
 	}
 }
 
 func (p *TCPProxyServer) releasePeerResource(ConnectionID string) {
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
+		log.Info("release peer resource, connectionID:", ConnectionID)
 		close(peerInfo.(peer).stop)
 		close(peerInfo.(peer).state.stop)
 		peerInfo.(peer).conn.Close()
@@ -56,6 +70,7 @@ func (p *TCPProxyServer) handleProxyRequestMessage(message *protobuf.Message, st
 	}*/
 
 	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
+	state.connectionID = ConnectionID
 	p.listenerBuffer <- peerListen{connectionID: ConnectionID, state: state}
 	go flushLoop(state)
 }
@@ -93,7 +108,11 @@ func (p *TCPProxyServer) handleControlMessage() {
 				p.handleProxyKeepaliveMessage(item.message, item.state)
 			case uint32(opcode.DisconnectCode):
 				p.handleDisconnectMessage(item.message)
+			default:
+				//log.Warn("please send correct control message type, include ProxyRequest/Keepalive/Disconnect, message.opcode:", item.message.Opcode, "send to ip:",item.message.Sender.Address)
 			}
+		case <-p.stop:
+			return
 		}
 	}
 }
