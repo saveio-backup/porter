@@ -15,13 +15,14 @@ import (
 	"time"
 	mRand "math/rand"
 	"net"
+	"github.com/saveio/porter/types/opcode"
 )
 
 const (
 	MONITOR_TIME_INTERVAL = 3
 	PEER_MONITOR_TIMEOUT  = 10 * time.Second
-	MESSAGE_CHANNEL_LEN   = 1024
-	LISTEN_CHANNEL_LEN    = 1024
+	MESSAGE_CHANNEL_LEN   = 65535
+	LISTEN_CHANNEL_LEN    = 65535
 )
 
 type port struct {
@@ -109,6 +110,7 @@ func (p *TCPProxyServer) tcpServerListenAndAccept(ip string, port uint16) {
 	p.mainListener, err = listen(ip, port)
 	if err != nil {
 		log.Errorf("tcp server listen start ERROR:", err.Error())
+		return
 	} else {
 		log.Info("TCP Proxy Listen IP:", p.mainListener.Addr().String())
 	}
@@ -122,6 +124,7 @@ func (p *TCPProxyServer) serverAccept() error {
 		conn, err := p.mainListener.Accept()
 		if err != nil {
 			log.Error("tcp listener accept error:", err.Error(), "listen addr:", p.mainListener.Addr().String())
+			continue
 		}
 		go func(conn net.Conn) {
 			connState := newConnState(conn,conn.RemoteAddr().String())
@@ -132,7 +135,9 @@ func (p *TCPProxyServer) serverAccept() error {
 					p.releasePeerResource(connState.connectionID)
 					break
 				}
-				p.msgBuffer <- msgNotify{message: message, state: connState}
+				if message.Opcode == uint32(opcode.ProxyRequestCode) || message.Opcode == uint32(opcode.KeepaliveCode) {
+					p.msgBuffer <- msgNotify{message: message, state: connState}
+				}
 			}
 		}(conn)
 	}

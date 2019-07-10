@@ -21,13 +21,14 @@ import (
 	"math/big"
 	"encoding/pem"
 	mRand "math/rand"
+	"github.com/saveio/porter/types/opcode"
 )
 
 const (
 	MONITOR_TIME_INTERVAL = 3
 	PEER_MONITOR_TIMEOUT  = 10 * time.Second
-	MESSAGE_CHANNEL_LEN   = 1024
-	LISTEN_CHANNEL_LEN    = 1024
+	MESSAGE_CHANNEL_LEN   = 65535
+	LISTEN_CHANNEL_LEN    = 65535
 )
 
 type port struct {
@@ -125,6 +126,7 @@ func listen(ip string, port uint16) (quic.Listener, error) {
 	listener, err := quic.ListenAddr(resolved, generateTLSConfig(), &quic.Config{KeepAlive: true, IdleTimeout: time.Second * 3})
 
 	if err != nil {
+		log.Error("quic listen start err:", err.Error())
 		return nil, err
 	}
 
@@ -136,6 +138,7 @@ func (p *QuicProxyServer) quicServerListenAndAccept(ip string, port uint16) {
 	p.mainListener, err = listen(ip, port)
 	if err != nil {
 		log.Errorf("quic server listen start ERROR:", err.Error())
+		return
 	} else {
 		log.Info("Quic Proxy Listen IP:", p.mainListener.Addr().String())
 	}
@@ -149,10 +152,13 @@ func (p *QuicProxyServer) serverAccept() error {
 		conn, err := p.mainListener.Accept()
 		if err != nil {
 			log.Error("quic listener accept error:", err.Error(), "listen addr:", p.mainListener.Addr().String())
+			continue
 		}
 		stream, err:= conn.AcceptStream()
 		if err!=nil{
 			log.Error("quic accept stream err:", err.Error(), "listen addr:",p.mainListener.Addr().String())
+			conn.Close()
+			continue
 		}
 		go func(stream quic.Stream, conn quic.Session) {
 			connState := newConnState(stream,conn.RemoteAddr().String())
@@ -163,7 +169,9 @@ func (p *QuicProxyServer) serverAccept() error {
 					p.releasePeerResource(connState.connectionID)
 					break
 				}
-				p.msgBuffer <- msgNotify{message: message, state: connState}
+				if message.Opcode == uint32(opcode.ProxyRequestCode) || message.Opcode == uint32(opcode.KeepaliveCode){
+					p.msgBuffer <- msgNotify{message: message, state: connState}
+				}
 			}
 		}(stream,conn)
 	}
@@ -190,4 +198,5 @@ func (p *QuicProxyServer) monitorPeerStatus() {
 func (p *QuicProxyServer) StartQuicServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.quicServerListenAndAccept(common.GetLocalIP(), port)
+	<- make(chan struct{})
 }
