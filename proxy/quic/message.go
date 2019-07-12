@@ -48,9 +48,12 @@ func flushLoop(state *ConnState) {
 func (p *QuicProxyServer) releasePeerResource(ConnectionID string) {
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
 		log.Info("release peer resource, connectionID:", ConnectionID)
-
-		close(peerInfo.(peer).stop)
-		close(peerInfo.(peer).state.stop)
+		if _,ok:=<-peerInfo.(peer).stop;ok{
+			close(peerInfo.(peer).stop)
+		}
+		if _,ok:=<-peerInfo.(peer).state.stop;ok{
+			close(peerInfo.(peer).state.stop)
+		}
 		peerInfo.(peer).conn.Close()
 		peerInfo.(peer).state.conn.Close()
 		p.proxies.Delete(ConnectionID)

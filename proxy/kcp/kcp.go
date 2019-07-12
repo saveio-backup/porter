@@ -156,4 +156,5 @@ func (p *KcpProxyServer) monitorPeerStatus() {
 func (p *KcpProxyServer) StartKCPServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.kcpServerListenAndAccept(common.GetLocalIP(), port)
+	<- make(chan struct{})
 }

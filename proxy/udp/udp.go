@@ -159,4 +159,5 @@ func (p *ProxyServer) monitorPeerStatus() {
 func (p *ProxyServer) StartUDPServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.serverListenAndAccept(common.GetLocalIP(), port)
+	<- make(chan struct{})
 }

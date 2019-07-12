@@ -164,4 +164,5 @@ func (p *TCPProxyServer) monitorPeerStatus() {
 func (p *TCPProxyServer) StartTCPServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.tcpServerListenAndAccept(common.GetLocalIP(), port)
+	<- make(chan struct{})
 }

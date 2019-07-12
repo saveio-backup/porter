@@ -120,10 +120,10 @@ func generateTLSConfig() *tls.Config {
 	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, NextProtos:[]string{"quic-proxy"}}
 }
 
-// Listen listens for incoming UDP connections on a specified port.
+// Listen listens for incoming quic connections on a specified port.
 func listen(ip string, port uint16) (quic.Listener, error) {
 	resolved := fmt.Sprintf("%s:%d", ip, port)
-	listener, err := quic.ListenAddr(resolved, generateTLSConfig(), &quic.Config{KeepAlive: true, IdleTimeout: time.Second * 3})
+	listener, err := quic.ListenAddr(resolved, generateTLSConfig(), &quic.Config{KeepAlive: true, IdleTimeout: time.Second * 15})
 
 	if err != nil {
 		log.Error("quic listen start err:", err.Error())
