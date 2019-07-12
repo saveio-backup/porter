@@ -12,6 +12,7 @@ import (
 	"time"
 	"github.com/saveio/porter/internal/protobuf"
 	"net"
+	"sync"
 )
 
 func (p *TCPProxyServer) startListenScheduler() {
@@ -21,7 +22,12 @@ func (p *TCPProxyServer) startListenScheduler() {
 			var proxyIP string
 			if _, ok:=p.proxies.Load(item.connectionID);!ok{
 				proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
-				sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
+				if err:= sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP});err!=nil{
+					log.Error("tcp proxy handle listen scheduler err:",err.Error())
+					if _,ok:=<-item.state.stop; ok{
+						close(item.state.stop)
+					}
+				}
 			}else{
 				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist.", item.connectionID, proxyIP))
 			}
@@ -48,6 +54,7 @@ func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnSt
 		loginTime:  time.Now(),
 		updateTime: time.Now(),
 		stop:       make(chan struct{}),
+		release:  	new(sync.Once),
 	}
 	p.proxies.Store(connectionID, peerInfo)
 

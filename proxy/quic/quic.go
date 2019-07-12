@@ -45,6 +45,7 @@ type peer struct {
 	updateTime time.Time
 	stop       chan struct{}
 	state      *ConnState
+	release    *sync.Once
 }
 type msgNotify struct {
 	message *protobuf.Message

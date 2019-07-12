@@ -12,6 +12,7 @@ import (
 	"time"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/lucas-clemente/quic-go"
+	"sync"
 )
 
 func (p *QuicProxyServer) startListenScheduler() {
@@ -21,7 +22,13 @@ func (p *QuicProxyServer) startListenScheduler() {
 			var proxyIP string
 			if _, ok:=p.proxies.Load(item.connectionID);!ok{
 				proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
-				sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
+				err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
+				if err!=nil{
+					log.Error("quic listen scheduler err:", err.Error())
+				}
+				if _,ok:=<-item.state.stop; ok{
+					close(item.state.stop)
+				}
 			}else{
 				log.Info(fmt.Sprintf("(quic) origin (%s) relay ip is: %s, has exist.", item.connectionID, proxyIP))
 			}
@@ -48,6 +55,7 @@ func (p *QuicProxyServer) proxyListenAndAccept(connectionID string, state *ConnS
 		loginTime:  time.Now(),
 		updateTime: time.Now(),
 		stop:       make(chan struct{}),
+		release:    new(sync.Once),
 	}
 	p.proxies.Store(connectionID, peerInfo)
 

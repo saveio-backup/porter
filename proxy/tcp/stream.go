@@ -27,22 +27,23 @@ func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
 	bytesRead, totalBytesRead := 0, 0
 
 	for totalBytesRead < 4 && err == nil {
-		//bytesRead, err = state.conn.Read(sizeBuf[totalBytesRead:])
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
+		if err!=nil || bytesRead == 0{
+			log.Error("tcp receive raw message body err:",err.Error(),"has read buffer message:", sizeBuf,"buffer.len:",bytesRead)
+			return nil, err
+		}
 		totalBytesRead += bytesRead
 	}
-	if err!=nil{
-		return nil,err
-	}
+
 	size = binary.BigEndian.Uint32(sizeBuf)
 	buffer := make([]byte, size)
 
 	bytesRead, totalBytesRead = 0, 0
 
 	for totalBytesRead < int(size) && err == nil {
-		//bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
-		if err!=nil{
+		if err!=nil || bytesRead == 0{
+			log.Error("tcp receive raw message body err:",err.Error(),"has read buffer message:", sizeBuf,"buffer.len:",bytesRead)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -63,7 +64,10 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 
 	for totalBytesRead < 4 && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
-		//bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
+		if err!=nil || bytesRead == 0{
+			log.Error("quic receive message body err:",err.Error(),"has read buffer message:", buffer,"buffer.len:",bytesRead)
+			return nil, err
+		}
 		totalBytesRead += bytesRead
 	}
 	size = binary.BigEndian.Uint32(buffer)
@@ -75,7 +79,10 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
-		//bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
+		if err!=nil || bytesRead == 0{
+			log.Error("quic receive message body err:",err.Error(),"has read buffer message:", buffer,"buffer.len:",bytesRead)
+			return nil, err
+		}
 		totalBytesRead += bytesRead
 	}
 
@@ -133,6 +140,7 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	//bw, isBuffered := w.(*bufio.Writer)
 	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
 		if err := state.writer.Flush(); err != nil {
+			log.Errorf("tcp stream(common): failed to flush buffer, err: %+v", err)
 			return err
 		}
 	}
@@ -141,6 +149,7 @@ func sendMessage(state *ConnState, message proto.Message) error {
 		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
 		if err != nil {
 			log.Errorf("tcp stream(common): failed to write entire buffer, err: %+v", err)
+			return err
 		}
 		totalBytesWritten += bytesWritten
 	}
@@ -165,6 +174,7 @@ func transferTcpRawMessage(message []byte, state *ConnState) error {
 
 	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
 		if err := state.writer.Flush(); err != nil {
+			log.Errorf("tcp stream(raw): failed to flush entire buffer, err: %+v", err)
 			return err
 		}
 	}

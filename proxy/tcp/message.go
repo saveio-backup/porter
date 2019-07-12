@@ -47,16 +47,15 @@ func flushLoop(state *ConnState) {
 
 func (p *TCPProxyServer) releasePeerResource(ConnectionID string) {
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
-		log.Info("release peer resource, connectionID:", ConnectionID)
-		if _,ok:=<-peerInfo.(peer).stop;ok{
+		peerInfo.(peer).release.Do(func() {
+			log.Info("release peer resource, connectionID:", ConnectionID)
 			close(peerInfo.(peer).stop)
-		}
-		if _,ok:=<-peerInfo.(peer).state.stop;ok{
 			close(peerInfo.(peer).state.stop)
-		}
-		peerInfo.(peer).conn.Close()
-		peerInfo.(peer).state.conn.Close()
-		p.proxies.Delete(ConnectionID)
+			peerInfo.(peer).conn.Close()
+			peerInfo.(peer).listener.Close()
+			peerInfo.(peer).state.conn.Close()
+			p.proxies.Delete(ConnectionID)
+		})
 	}
 }
 
@@ -91,8 +90,12 @@ func (p *TCPProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 				loginTime:  peerInfo.(peer).loginTime,
 				stop:       peerInfo.(peer).stop,
 				state:      peerInfo.(peer).state,
+				listener:	peerInfo.(peer).listener,
+				release: 	peerInfo.(peer).release,
 			})
-		sendMessage(state, &protobuf.KeepaliveResponse{})
+		if err := sendMessage(state, &protobuf.KeepaliveResponse{});err!=nil{
+			log.Error("tcp handleProxyKeepaliveMessage err:", err.Error())
+		}
 	}
 }
 

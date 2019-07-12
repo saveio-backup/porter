@@ -10,9 +10,10 @@ import (
 	"github.com/saveio/themis/common/log"
 	"net"
 	"os"
+	"strings"
 )
 
-func GetLocalIP() string {
+func getDefaultIP() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		log.Error("get local ip err:", err.Error())
@@ -27,6 +28,29 @@ func GetLocalIP() string {
 		}
 	}
 	return ""
+}
+
+func GetLocalIP() string {
+	if Parameters.InterfaceName != "" && Parameters.InnerIP != "" {
+		iface, err := net.InterfaceByName(Parameters.InterfaceName)
+		if err != nil {
+			log.Error("get interface err:", err.Error())
+			os.Exit(1)
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			log.Error("get addrs err from special net interface:", err.Error())
+			os.Exit(1)
+		}
+		for _, addr := range addrs {
+			if strings.Split(addr.String(), "/")[0] == Parameters.InnerIP {
+				return Parameters.InnerIP
+			}
+		}
+		log.Error("inner IP is not match Interface, please review your config.json again.")
+		os.Exit(1)
+	}
+	return getDefaultIP()
 }
 
 func GetPublicIP() string {

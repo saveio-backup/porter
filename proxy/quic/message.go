@@ -47,16 +47,15 @@ func flushLoop(state *ConnState) {
 
 func (p *QuicProxyServer) releasePeerResource(ConnectionID string) {
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
-		log.Info("release peer resource, connectionID:", ConnectionID)
-		if _,ok:=<-peerInfo.(peer).stop;ok{
+		peerInfo.(peer).release.Do(func() {
+			log.Info("release peer resource, connectionID:", ConnectionID)
 			close(peerInfo.(peer).stop)
-		}
-		if _,ok:=<-peerInfo.(peer).state.stop;ok{
 			close(peerInfo.(peer).state.stop)
-		}
-		peerInfo.(peer).conn.Close()
-		peerInfo.(peer).state.conn.Close()
-		p.proxies.Delete(ConnectionID)
+			peerInfo.(peer).listener.Close()
+			peerInfo.(peer).conn.Close()
+			peerInfo.(peer).state.conn.Close()
+			p.proxies.Delete(ConnectionID)
+		})
 	}
 }
 
@@ -91,8 +90,13 @@ func (p *QuicProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message,
 				loginTime:  peerInfo.(peer).loginTime,
 				stop:       peerInfo.(peer).stop,
 				state:      peerInfo.(peer).state,
+				listener:	peerInfo.(peer).listener,
+				release: 	peerInfo.(peer).release,
 			})
-		sendMessage(state, &protobuf.KeepaliveResponse{})
+		err:=sendMessage(state, &protobuf.KeepaliveResponse{})
+		if err!=nil{
+			log.Error("(quic) handle proxyKeepaliveMessage when send, error:", err.Error())
+		}
 	}
 }
 
