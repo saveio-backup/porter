@@ -23,7 +23,7 @@ type protocols struct {
 }
 
 type UsingPort struct {
-	Timestap     time.Time
+	Timestamp     time.Time
 	ConnectionID string
 	Port         uint16
 	Protocol     string
@@ -42,17 +42,18 @@ var PortSet Ports
 func RandomPort(protocol string, connectionID string) uint16 {
 	PortSet.writeMutex.Lock()
 	timeout:=Parameters.PortTimeout
-	if Parameters.PortTimeout<=0{
+	if Parameters.PortTimeout<=0 {
 		timeout = DEFAULT_PORT_CACHE_TIME
 	}
 
 	key := fmt.Sprintf("%s-%s", protocol, connectionID)
 	if port, ok := PortSet.Cache.Load(key); ok {
-		if time.Now().After(port.(UsingPort).Timestap.Add(timeout * time.Second)) {
+		if time.Now().After(port.(*UsingPort).Timestamp.Add(timeout * time.Second)) {
 			PortSet.Cache.Delete(key)
 		} else {
+			port.(*UsingPort).Timestamp = time.Now()
 			PortSet.writeMutex.Unlock()
-			return port.(UsingPort).Port
+			return port.(*UsingPort).Port
 		}
 	}
 
@@ -74,7 +75,7 @@ func RandomPort(protocol string, connectionID string) uint16 {
 				log.Error("not support ", protocol, ", please use tcp/kcp/udp/quic.")
 				return 0
 			}
-			PortSet.Cache.Store(key, UsingPort{Timestap: time.Now(), ConnectionID: connectionID, Port: port, Protocol: protocol})
+			PortSet.Cache.Store(key, &UsingPort{Timestamp: time.Now(), ConnectionID: connectionID, Port: port, Protocol: protocol})
 			PortSet.writeMutex.Unlock()
 			return port
 		} else {

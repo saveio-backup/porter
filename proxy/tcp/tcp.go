@@ -165,8 +165,8 @@ func (p *TCPProxyServer) monitorPeerStatus() {
 				timeout = DEFAULT_PORT_CACHE_TIME
 			}
 			common.PortSet.Cache.Range(func(key, value interface{}) bool {
-				if time.Now().After(value.(common.UsingPort).Timestap.Add(timeout*time.Second)){
-					common.PortSet.Cache.Delete(fmt.Sprintf("%s-%s",value.(common.UsingPort).Protocol,value.(common.UsingPort).ConnectionID))
+				if time.Now().After(value.(*common.UsingPort).Timestamp.Add(timeout*time.Second)){
+					common.PortSet.Cache.Delete(fmt.Sprintf("%s-%s",value.(*common.UsingPort).Protocol,value.(*common.UsingPort).ConnectionID))
 				}
 				return true
 			})
