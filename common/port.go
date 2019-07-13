@@ -6,16 +6,27 @@
 package common
 
 import (
+	"fmt"
 	"github.com/saveio/themis/common/log"
 	"math/rand"
 	"sync"
+	"time"
 )
 
+const DEFAULT_PORT_CACHE_TIME = 7200
+
 type protocols struct {
-	udp bool
-	kcp bool
-	tcp bool
+	udp  bool
+	kcp  bool
+	tcp  bool
 	quic bool
+}
+
+type UsingPort struct {
+	Timestap     time.Time
+	ConnectionID string
+	Port         uint16
+	Protocol     string
 }
 
 type Ports struct {
@@ -23,31 +34,48 @@ type Ports struct {
 	begin      int
 	ranges     int
 	writeMutex *sync.Mutex
+	Cache      *sync.Map
 }
 
-var ports Ports
+var PortSet Ports
 
-func RandomPort(protocol string) uint16 {
-	ports.writeMutex.Lock()
-	start := rand.Intn(ports.ranges)
+func RandomPort(protocol string, connectionID string) uint16 {
+	PortSet.writeMutex.Lock()
+	timeout:=Parameters.PortTimeout
+	if Parameters.PortTimeout<=0{
+		timeout = DEFAULT_PORT_CACHE_TIME
+	}
+
+	key := fmt.Sprintf("%s-%s", protocol, connectionID)
+	if port, ok := PortSet.Cache.Load(key); ok {
+		if time.Now().After(port.(UsingPort).Timestap.Add(timeout * time.Second)) {
+			PortSet.Cache.Delete(key)
+		} else {
+			PortSet.writeMutex.Unlock()
+			return port.(UsingPort).Port
+		}
+	}
+
+	start := rand.Intn(PortSet.ranges)
 	for {
-		port := uint16(start + ports.begin)
-		if _, ok := ports.usingPorts.Load(port); !ok {
+		port := uint16(start + PortSet.begin)
+		if _, ok := PortSet.usingPorts.Load(port); !ok {
 			switch protocol {
 			case "udp":
-				ports.usingPorts.Store(port, protocols{udp: true})
+				PortSet.usingPorts.Store(port, protocols{udp: true})
 			case "kcp":
-				ports.usingPorts.Store(port, protocols{kcp: true})
+				PortSet.usingPorts.Store(port, protocols{kcp: true})
 			case "tcp":
-				ports.usingPorts.Store(port, protocols{tcp: true})
+				PortSet.usingPorts.Store(port, protocols{tcp: true})
 			case "quic":
-				ports.usingPorts.Store(port, protocols{quic: true})
+				PortSet.usingPorts.Store(port, protocols{quic: true})
 			default:
-				ports.writeMutex.Unlock()
+				PortSet.writeMutex.Unlock()
 				log.Error("not support ", protocol, ", please use tcp/kcp/udp/quic.")
 				return 0
 			}
-			ports.writeMutex.Unlock()
+			PortSet.Cache.Store(key, UsingPort{Timestap: time.Now(), ConnectionID: connectionID, Port: port, Protocol: protocol})
+			PortSet.writeMutex.Unlock()
 			return port
 		} else {
 			start += 1
@@ -56,10 +84,11 @@ func RandomPort(protocol string) uint16 {
 }
 
 func InitPorts() {
-	ports = Ports{
+	PortSet = Ports{
 		begin:      Parameters.RandomPortBegin,
 		ranges:     Parameters.RandomPortRange,
 		usingPorts: new(sync.Map),
 		writeMutex: new(sync.Mutex),
+		Cache:      new(sync.Map),
 	}
 }

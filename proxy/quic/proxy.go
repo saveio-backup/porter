@@ -39,7 +39,7 @@ func (p *QuicProxyServer) startListenScheduler() {
 }
 
 func (p *QuicProxyServer) proxyListenAndAccept(connectionID string, state *ConnState) string {
-	port := common.RandomPort("quic")
+	port := common.RandomPort("quic",connectionID)
 	listener, err := listen(common.GetLocalIP(), port)
 	if err != nil {
 		log.Error("proxy listen server start ERROR:", err.Error())

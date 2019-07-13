@@ -86,7 +86,7 @@ func (p *ProxyServer) publicHostForSpecProxy(listener *net.UDPConn, port uint16)
 }
 
 func (p *ProxyServer) proxyListenAndAccept(ConnectionID string, remoteAddr string) string {
-	randomPort := common.RandomPort("udp")
+	randomPort := common.RandomPort("udp", ConnectionID)
 	listener, err := listen(common.GetLocalIP(), randomPort)
 	if err != nil {
 		log.Error("proxy listen server start ERROR:", err.Error())

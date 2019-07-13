@@ -33,7 +33,7 @@ func (p *KcpProxyServer) startListenScheduler() {
 }
 
 func (p *KcpProxyServer) proxyListenAndAccept(ConnectionID string, state *ConnState) string {
-	port := common.RandomPort("kcp")
+	port := common.RandomPort("kcp",ConnectionID)
 	listener, err := listen(common.GetLocalIP(), port)
 	if err != nil {
 		log.Error("proxy listen server start ERROR:", err.Error())

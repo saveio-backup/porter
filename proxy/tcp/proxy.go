@@ -38,7 +38,7 @@ func (p *TCPProxyServer) startListenScheduler() {
 }
 
 func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnState) string {
-	port := common.RandomPort("tcp")
+	port := common.RandomPort("tcp",connectionID)
 	listener, err := listen(common.GetLocalIP(), port)
 	if err != nil {
 		log.Error("proxy listen server start ERROR:", err.Error())

@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 )
 
 const (
@@ -20,16 +21,17 @@ const (
 var Version string
 
 type Configuration struct {
-	InterfaceName   string `json:"InterfaceName"`
-	InnerIP         string `json:"InnerIP"`
-	PublicIP        string `json:"PublicIP"`
-	RandomPortBegin int    `json:"RandomPortBegin"`
-	RandomPortRange int    `json:"RandomPortRange"`
-	UPort           int    `json:"UPort"`
-	KPort           int    `json:"KPort"`
-	LogDir          string `json:"LogDir"`
-	QPort           int    `json:"QPort"`
-	TPort           int    `json:"TPort"`
+	InterfaceName   string        `json:"InterfaceName"`
+	InnerIP         string        `json:"InnerIP"`
+	PublicIP        string        `json:"PublicIP"`
+	RandomPortBegin int           `json:"RandomPortBegin"`
+	RandomPortRange int           `json:"RandomPortRange"`
+	UPort           int           `json:"UPort"`
+	KPort           int           `json:"KPort"`
+	QPort           int           `json:"QPort"`
+	TPort           int           `json:"TPort"`
+	PortTimeout     time.Duration `json:"PortTimeout"`
+	LogDir          string        `json:"LogDir"`
 }
 
 type ConfigFile struct {

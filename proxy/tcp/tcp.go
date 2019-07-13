@@ -21,6 +21,7 @@ import (
 const (
 	MONITOR_TIME_INTERVAL = 3
 	PEER_MONITOR_TIMEOUT  = 10 * time.Second
+	DEFAULT_PORT_CACHE_TIME = 7200
 	MESSAGE_CHANNEL_LEN   = 65535
 	LISTEN_CHANNEL_LEN    = 65535
 )
@@ -155,6 +156,17 @@ func (p *TCPProxyServer) monitorPeerStatus() {
 				if time.Now().After(value.(peer).updateTime.Add(PEER_MONITOR_TIMEOUT)) {
 					p.releasePeerResource(key.(string))
 					log.Info("client has disconnect from proxy server, peerID:", key.(string))
+				}
+				return true
+			})
+
+			timeout:=common.Parameters.PortTimeout
+			if common.Parameters.PortTimeout<=0{
+				timeout = DEFAULT_PORT_CACHE_TIME
+			}
+			common.PortSet.Cache.Range(func(key, value interface{}) bool {
+				if time.Now().After(value.(common.UsingPort).Timestap.Add(timeout*time.Second)){
+					common.PortSet.Cache.Delete(fmt.Sprintf("%s-%s",value.(common.UsingPort).Protocol,value.(common.UsingPort).ConnectionID))
 				}
 				return true
 			})
