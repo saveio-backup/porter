@@ -31,6 +31,7 @@ type Configuration struct {
 	QPort           int           `json:"QPort"`
 	TPort           int           `json:"TPort"`
 	PortTimeout     time.Duration `json:"PortTimeout"`
+	NetworkID       uint32        `json:"NetworkID"`
 	LogDir          string        `json:"LogDir"`
 }
 

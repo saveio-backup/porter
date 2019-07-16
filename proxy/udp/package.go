@@ -52,7 +52,8 @@ func prepareMessage(message proto.Message) []byte {
 	msg := &protobuf.Message{
 		Opcode:  uint32(codeNum),
 		Message: bytes,
-		Sender:  &protobuf.ID{Address: common.GetPublicHost("udp")},
+		Sender:  &protobuf.ID{Address: common.GetPublicHost("udp"), NetKey: []byte("PORTER_UDP_NETKEY")},
+		NetID:   common.Parameters.NetworkID,
 	}
 	raw, err := proto.Marshal(msg)
 	if err != nil {

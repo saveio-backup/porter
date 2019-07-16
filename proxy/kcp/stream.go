@@ -7,6 +7,7 @@ package kcp
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/saveio/porter/common"
@@ -14,7 +15,6 @@ import (
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
 	"sync/atomic"
-	"encoding/hex"
 )
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
@@ -45,7 +45,7 @@ func receiveKCPRawMessage(state *ConnState) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal message")
 	}
-	log.Infof("receive kcp coming message, which will be transfer directly, message.opcode:%d, message.signature:%s, message.addr:%s",msg.Opcode,hex.EncodeToString(msg.Signature), msg.Sender.Address)
+	log.Infof("receive kcp coming message, which will be transfer directly, message.opcode:%d, message.signature:%s, message.addr:%s", msg.Opcode, hex.EncodeToString(msg.Signature), msg.Sender.Address)
 	return append(sizeBuf, buffer...), nil
 }
 
@@ -99,8 +99,9 @@ func prepareMessage(message proto.Message, state *ConnState) *protobuf.Message {
 	return &protobuf.Message{
 		Opcode:       uint32(opcode),
 		Message:      bytes,
-		Sender:       &protobuf.ID{Address: common.GetPublicHost("kcp")},
+		Sender:       &protobuf.ID{Address: common.GetPublicHost("kcp"), NetKey: []byte("PORTER_KCP_NETKEY")},
 		MessageNonce: atomic.AddUint64(&state.messageNonce, 1),
+		NetID:        common.Parameters.NetworkID,
 	}
 }
 

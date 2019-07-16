@@ -13,8 +13,8 @@ import (
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
-	"sync/atomic"
 	"io"
+	"sync/atomic"
 )
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
@@ -28,8 +28,8 @@ func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
 
 	for totalBytesRead < 4 && err == nil {
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
-		if err!=nil || bytesRead == 0{
-			log.Error("tcp receive raw message body err:",err.Error(),"has read buffer message:", sizeBuf,"buffer.len:",bytesRead)
+		if err != nil || bytesRead == 0 {
+			log.Error("tcp receive raw message body err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -42,13 +42,13 @@ func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
 
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
-		if err!=nil || bytesRead == 0{
-			log.Error("tcp receive raw message body err:",err.Error(),"has read buffer message:", sizeBuf,"buffer.len:",bytesRead)
+		if err != nil || bytesRead == 0 {
+			log.Error("tcp receive raw message body err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
 	}
-	if err!=nil{
+	if err != nil {
 		return nil, err
 	}
 	totalBytesRead += bytesRead
@@ -64,8 +64,8 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 
 	for totalBytesRead < 4 && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
-		if err!=nil || bytesRead == 0{
-			log.Error("quic receive message body err:",err.Error(),"has read buffer message:", buffer,"buffer.len:",bytesRead)
+		if err != nil || bytesRead == 0 {
+			log.Error("tcp receive message body err:", err.Error(), "has read buffer message:", buffer, "buffer.len:", bytesRead)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -79,8 +79,8 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
-		if err!=nil || bytesRead == 0{
-			log.Error("quic receive message body err:",err.Error(),"has read buffer message:", buffer,"buffer.len:",bytesRead)
+		if err != nil || bytesRead == 0 {
+			log.Error("tcp receive message body err:", err.Error(), "has read buffer message:", buffer, "buffer.len:", bytesRead)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -113,8 +113,9 @@ func prepareMessage(message proto.Message, state *ConnState) *protobuf.Message {
 	return &protobuf.Message{
 		Opcode:       uint32(opcode),
 		Message:      bytes,
-		Sender:       &protobuf.ID{Address: common.GetPublicHost("tcp")},
+		Sender:       &protobuf.ID{Address: common.GetPublicHost("tcp"),NetKey:[]byte("PORTER_TCP_NETKEY")},
 		MessageNonce: atomic.AddUint64(&state.messageNonce, 1),
+		NetID:        common.Parameters.NetworkID,
 	}
 }
 
@@ -163,7 +164,7 @@ func sendMessage(state *ConnState, message proto.Message) error {
 
 func transferTcpRawMessage(message []byte, state *ConnState) error {
 	totalSize := len(message)
-	if totalSize == 0{
+	if totalSize == 0 {
 		return errors.New("in transferTCPRawMessage, will send empty message")
 	}
 	// Write until all bytes have been written.

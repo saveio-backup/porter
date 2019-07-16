@@ -10,6 +10,7 @@
     "QPort":6008,
     "TPort":6008,
     "PortTimeout":7200,
+    "NetworkID":0,
     "LogDir":"./"
   }
 }
