@@ -12,6 +12,7 @@ import (
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
 	"time"
+	"fmt"
 )
 
 const writeFLushLatency = 10 * time.Millisecond
@@ -76,7 +77,16 @@ func (p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 				stop:       peerInfo.(peer).stop,
 				state:      peerInfo.(peer).state,
 			})
-		sendMessage(state, &protobuf.KeepaliveResponse{})
+		err:=sendMessage(state, &protobuf.KeepaliveResponse{})
+		if err!=nil{
+			log.Error("(quic) handle proxyKeepaliveMessage when send, error:", err.Error())
+		}
+	}
+	common.PortSet.WriteMutex.Lock()
+	key := fmt.Sprintf("tcp-%s", ConnectionID)
+	if port, ok := common.PortSet.Cache.Load(key); ok {
+		port.(*common.UsingPort).Timestamp = time.Now()
+		common.PortSet.WriteMutex.Unlock()
 	}
 }
 

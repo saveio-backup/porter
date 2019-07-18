@@ -66,18 +66,21 @@ func prepareMessage(message proto.Message) []byte {
 	return buffer
 }
 
-func sendUDPMessage(message proto.Message, udpConn *net.UDPConn, remoteAddr string) {
+func sendUDPMessage(message proto.Message, udpConn *net.UDPConn, remoteAddr string) error{
 	addrInfo, err := common.ParseAddress(remoteAddr)
 	resolved, err := net.ResolveUDPAddr("udp", addrInfo.ToString())
 	if err != nil {
 		log.Error("in serverAccept, resolve:", err.Error())
+		return err
 	}
 
 	buffer := prepareMessage(message)
 	_, err = udpConn.WriteToUDP(buffer, resolved)
 	if err != nil {
 		log.Error("err:", err.Error())
+		return err
 	}
+	return nil
 }
 
 func transferUDPRawMessage(message []byte, udpConn *net.UDPConn, remoteAddr string) {

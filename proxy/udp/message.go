@@ -11,6 +11,7 @@ import (
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/themis/common/log"
 	"time"
+	"fmt"
 )
 
 func (p *ProxyServer) handleProxyRequestMessage(message *protobuf.Message, remoteAddr string) {
@@ -52,7 +53,16 @@ func (p *ProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message) {
 				loginTime:  peerInfo.(peer).loginTime,
 				stop:       peerInfo.(peer).stop,
 			})
-		sendUDPMessage(&protobuf.KeepaliveResponse{}, p.listener, peerInfo.(peer).addr)
+		err:=sendUDPMessage(&protobuf.KeepaliveResponse{}, p.listener, peerInfo.(peer).addr)
+		if err!=nil{
+			log.Error("(quic) handle proxyKeepaliveMessage when send, error:", err.Error())
+		}
+	}
+	common.PortSet.WriteMutex.Lock()
+	key := fmt.Sprintf("tcp-%s", ConnectionID)
+	if port, ok := common.PortSet.Cache.Load(key); ok {
+		port.(*common.UsingPort).Timestamp = time.Now()
+		common.PortSet.WriteMutex.Unlock()
 	}
 }
 

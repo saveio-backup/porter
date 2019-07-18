@@ -11,6 +11,8 @@ import (
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
 	"time"
+	"github.com/saveio/porter/common"
+	"fmt"
 )
 
 const writeFLushLatency = 50 * time.Millisecond
@@ -96,6 +98,12 @@ func (p *TCPProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 		if err := sendMessage(state, &protobuf.KeepaliveResponse{});err!=nil{
 			log.Error("tcp handleProxyKeepaliveMessage err:", err.Error())
 		}
+	}
+	common.PortSet.WriteMutex.Lock()
+	key := fmt.Sprintf("tcp-%s", ConnectionID)
+	if port, ok := common.PortSet.Cache.Load(key); ok {
+		port.(*common.UsingPort).Timestamp = time.Now()
+		common.PortSet.WriteMutex.Unlock()
 	}
 }
 

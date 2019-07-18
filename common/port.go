@@ -33,14 +33,14 @@ type Ports struct {
 	usingPorts *sync.Map
 	begin      int
 	ranges     int
-	writeMutex *sync.Mutex
+	WriteMutex *sync.Mutex
 	Cache      *sync.Map
 }
 
 var PortSet Ports
 
 func RandomPort(protocol string, connectionID string) uint16 {
-	PortSet.writeMutex.Lock()
+	PortSet.WriteMutex.Lock()
 	timeout:=Parameters.PortTimeout
 	if Parameters.PortTimeout<=0 {
 		timeout = DEFAULT_PORT_CACHE_TIME
@@ -52,7 +52,7 @@ func RandomPort(protocol string, connectionID string) uint16 {
 			PortSet.Cache.Delete(key)
 		} else {
 			port.(*UsingPort).Timestamp = time.Now()
-			PortSet.writeMutex.Unlock()
+			PortSet.WriteMutex.Unlock()
 			return port.(*UsingPort).Port
 		}
 	}
@@ -71,12 +71,12 @@ func RandomPort(protocol string, connectionID string) uint16 {
 			case "quic":
 				PortSet.usingPorts.Store(port, protocols{quic: true})
 			default:
-				PortSet.writeMutex.Unlock()
+				PortSet.WriteMutex.Unlock()
 				log.Error("not support ", protocol, ", please use tcp/kcp/udp/quic.")
 				return 0
 			}
 			PortSet.Cache.Store(key, &UsingPort{Timestamp: time.Now(), ConnectionID: connectionID, Port: port, Protocol: protocol})
-			PortSet.writeMutex.Unlock()
+			PortSet.WriteMutex.Unlock()
 			return port
 		} else {
 			start += 1
@@ -89,7 +89,7 @@ func InitPorts() {
 		begin:      Parameters.RandomPortBegin,
 		ranges:     Parameters.RandomPortRange,
 		usingPorts: new(sync.Map),
-		writeMutex: new(sync.Mutex),
+		WriteMutex: new(sync.Mutex),
 		Cache:      new(sync.Map),
 	}
 }
