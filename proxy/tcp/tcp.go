@@ -125,7 +125,7 @@ func (p *TCPProxyServer) serverAccept() error {
 	for {
 		conn, err := p.mainListener.Accept()
 		if err != nil {
-			log.Error("tcp listener accept error:", err.Error(), "listen addr:", p.mainListener.Addr().String())
+			log.Warn("tcp listener accept error:", err.Error(), "listen addr:", p.mainListener.Addr().String())
 			continue
 		}
 		go func(conn net.Conn) {
@@ -133,7 +133,7 @@ func (p *TCPProxyServer) serverAccept() error {
 			for {
 				message, err := receiveMessage(connState)
 				if nil == message || err != nil {
-					log.Error("tcp receive message goroutine err:", err.Error(), "listen remote addr:",conn.RemoteAddr().String())
+					log.Warn("tcp receive message goroutine err:", err.Error(), "listen remote addr:",conn.RemoteAddr().String())
 					p.releasePeerResource(connState.connectionID)
 					break
 				}

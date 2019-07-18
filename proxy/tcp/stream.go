@@ -15,6 +15,8 @@ import (
 	"github.com/saveio/themis/common/log"
 	"io"
 	"sync/atomic"
+	"fmt"
+	"runtime/debug"
 )
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
@@ -123,6 +125,11 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	bytes, err := proto.Marshal(prepareMessage(message, state))
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal message")
+	}
+	if len(bytes) == 0{
+		panic("(tcp)sendMessage receive empty message.")
+		log.Info("stack info:",fmt.Sprintf("%s",debug.Stack()))
+		return errors.New("tcp sendMessage,len(message) is empty")
 	}
 
 	// Serialize size.

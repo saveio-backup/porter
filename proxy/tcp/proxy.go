@@ -22,6 +22,10 @@ func (p *TCPProxyServer) startListenScheduler() {
 			var proxyIP string
 			if _, ok:=p.proxies.Load(item.connectionID);!ok{
 				proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
+				if "" == proxyIP {
+					log.Error("in startListenScheduler, listen and accept get nil proxyIP value")
+					continue
+				}
 				if err:= sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP});err!=nil{
 					log.Error("tcp proxy handle listen scheduler err:",err.Error())
 					if _,ok:=<-item.state.stop; ok{
@@ -81,12 +85,12 @@ func(p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error{
 			default:
 				buffer, err := receiveTcpRawMessage(connState)
 				if 0 == len(buffer) || nil == buffer{
-					log.Error("(tcp) onceAccept groutine, receive empty message")
+					log.Warn("(tcp) onceAccept groutine, receive empty message")
 					return
 				}
 				err = transferTcpRawMessage(buffer, peerInfo.state)
 				if err!=nil {
-					log.Error("transfer tcp raw message err:", err.Error(),"addr:", peerInfo.listener.Addr().String())
+					log.Warn("transfer tcp raw message err:", err.Error(),"addr:", peerInfo.listener.Addr().String())
 					return
 				}
 			}
@@ -103,6 +107,7 @@ func (p *TCPProxyServer) proxyAccept(peerInfo peer, connectionID string) error {
 			return nil
 		default:
 			if err:= p.onceAccept(peerInfo, connectionID); err!=nil{
+				log.Error("proxyAccept run err when gothrough onceAccept, err:",err.Error())
 				return err
 			}
 		}

@@ -63,17 +63,7 @@ func (p *TCPProxyServer) releasePeerResource(ConnectionID string) {
 
 func (p *TCPProxyServer) handleProxyRequestMessage(message *protobuf.Message, state *ConnState) {
 
-	//if the client is working in public-net environment, return ip address directly
-/*	if message.Sender.Address == state.conn.RemoteAddr().String() {
-		addrInfo, err := common.ParseAddress(state.conn.RemoteAddr().String())
-		if err != nil {
-			log.Error("parse remoteAddr err:", err.Error())
-			return
-		}
-		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress: addrInfo.ToString()})
-		return
-	}*/
-
+	//todo:if the client is working in public-net environment, return ip address directly
 	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
 	state.connectionID = ConnectionID
 	p.listenerBuffer <- peerListen{connectionID: ConnectionID, state: state}
