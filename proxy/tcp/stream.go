@@ -127,9 +127,9 @@ func sendMessage(state *ConnState, message proto.Message) error {
 		return errors.Wrap(err, "failed to marshal message")
 	}
 	if len(bytes) == 0{
-		panic("(tcp)sendMessage receive empty message.")
 		log.Info("stack info:",fmt.Sprintf("%s",debug.Stack()))
 		return errors.New("tcp sendMessage,len(message) is empty")
+		panic("(tcp)sendMessage receive empty message.")
 	}
 
 	// Serialize size.
