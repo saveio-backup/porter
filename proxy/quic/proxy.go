@@ -20,7 +20,7 @@ func (p *QuicProxyServer) startListenScheduler() {
 		select {
 		case item := <-p.listenerBuffer:
 			var proxyIP string
-			if _, ok:=p.proxies.Load(item.connectionID);!ok{
+			if value, ok:=p.proxies.Load(item.connectionID);!ok{
 				proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
 				err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
 				if err!=nil{
@@ -30,8 +30,13 @@ func (p *QuicProxyServer) startListenScheduler() {
 					close(item.state.stop)
 				}
 			}else{
-				log.Info(fmt.Sprintf("(quic) origin (%s) relay ip is: %s, has exist.", item.connectionID, proxyIP))
-			}
+				log.Info(fmt.Sprintf("(quic) origin (%s) relay ip is: %s, has exist.", item.connectionID, value.(peer).addr))
+				if err:= sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: value.(peer).addr});err!=nil{
+						log.Error("quic proxy handle listen scheduler when re-sent, err:",err.Error())
+						if _,ok:=<-item.state.stop; ok{
+							close(item.state.stop)
+						}
+					}}
 		case <-p.stop:
 			return
 		}
@@ -48,7 +53,7 @@ func (p *QuicProxyServer) proxyListenAndAccept(connectionID string, state *ConnS
 		log.Info("listen to server",listener.Addr().String())
 	}
 
-	peerInfo := peer{addr: fmt.Sprintf("quic://%s:%d", common.GetLocalIP(), port),
+	peerInfo := peer{addr: fmt.Sprintf("//%s:%d", common.GetPublicIP(), port),
 		state:      state,
 		conn:       state.conn,
 		listener:   listener,
