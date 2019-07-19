@@ -57,7 +57,7 @@ func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnSt
 		log.Info("listen to server",listener.Addr().String())
 	}
 
-	peerInfo := peer{addr: fmt.Sprintf("//%s:%d", common.GetPublicIP(), port),
+	peerInfo := peer{addr: fmt.Sprintf("%s:%d", common.GetPublicIP(), port),
 		state:      state,
 		conn:       state.conn,
 		listener:   listener,
