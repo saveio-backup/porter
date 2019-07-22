@@ -28,17 +28,11 @@ func (p *TCPProxyServer) startListenScheduler() {
 				}
 				if err:= sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP});err!=nil{
 					log.Error("tcp proxy handle listen scheduler err:",err.Error())
-					if _,ok:=<-item.state.stop; ok{
-						close(item.state.stop)
-					}
 				}
 			}else{
 				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist.", item.connectionID, value.(peer).addr))
 				if err:= sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: value.(peer).addr});err!=nil{
 					log.Error("tcp proxy handle listen scheduler when re-sent, err:",err.Error())
-					if _,ok:=<-item.state.stop; ok{
-						close(item.state.stop)
-					}
 				}
 			}
 		case <-p.stop:

@@ -11,6 +11,7 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"net"
 )
 
 const DEFAULT_PORT_CACHE_TIME = 7200
@@ -67,6 +68,12 @@ func RandomPort(protocol string, connectionID string) uint16 {
 			case "kcp":
 				PortSet.usingPorts.Store(port, protocols{kcp: true})
 			case "tcp":
+				conn, err:=net.Dial(protocol,fmt.Sprintf("%s:%d",GetLocalIP(),port))
+				if conn!=nil && err==nil {
+					log.Error("What a superise, another goroutine is using the same port:", port)
+					conn.Close()
+					continue
+				}
 				PortSet.usingPorts.Store(port, protocols{tcp: true})
 			case "quic":
 				PortSet.usingPorts.Store(port, protocols{quic: true})
