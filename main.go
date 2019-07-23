@@ -9,17 +9,18 @@ import (
 	"flag"
 	"github.com/saveio/porter/common"
 	kcpProxy "github.com/saveio/porter/proxy/kcp"
+	quicProxy "github.com/saveio/porter/proxy/quic"
+	tcpProxy "github.com/saveio/porter/proxy/tcp"
 	udpProxy "github.com/saveio/porter/proxy/udp"
 	"github.com/saveio/themis/common/log"
 	"os"
-	quicProxy "github.com/saveio/porter/proxy/quic"
-	tcpProxy "github.com/saveio/porter/proxy/tcp"
 )
 
 func main() {
 	protocol := flag.String("protocol", "", "protocol to use (kcp/tcp/udp)")
 	flag.Parse()
-	log.InitLog(log.InfoLog,common.GetLogDir(),os.Stdout)
+	log.InitLog(common.Parameters.LogLevel, common.GetLogDir(), os.Stdout)
+	log.Debug("porter version:", common.Version)
 	switch *protocol {
 	case "udp":
 		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
@@ -35,5 +36,7 @@ func main() {
 		quicProxy.Init().StartQuicServer(uint16(common.GetPortFromParamsByProtocol("quic")))
 		tcpProxy.Init().StartTCPServer(uint16(common.GetPortFromParamsByProtocol("tcp")))
 	}
+
+	go common.CheckLogFileSize()
 	select {}
 }

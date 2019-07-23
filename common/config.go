@@ -33,6 +33,7 @@ type Configuration struct {
 	PortTimeout     time.Duration `json:"PortTimeout"`
 	NetworkID       uint32        `json:"NetworkID"`
 	LogDir          string        `json:"LogDir"`
+	LogLevel        int           `json:"LogLevel"`
 }
 
 type ConfigFile struct {

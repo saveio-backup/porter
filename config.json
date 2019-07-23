@@ -11,6 +11,7 @@
     "TPort":6008,
     "PortTimeout":180,
     "NetworkID":0,
-    "LogDir":"./"
+    "LogDir":"./",
+    "LogLevel":1
   }
 }
