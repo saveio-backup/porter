@@ -7,6 +7,7 @@ package quic
 
 import (
 	"encoding/binary"
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/saveio/porter/common"
@@ -14,6 +15,7 @@ import (
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
 	"io"
+	"runtime/debug"
 	"sync/atomic"
 )
 
@@ -93,8 +95,8 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal message")
 	}
 	// Check if any of the message headers are invalid or null.
-	if msg.Opcode == 0 || msg.Sender == nil || msg.Sender.NetKey == nil || len(msg.Sender.Address) == 0 {
-		return nil, errors.New("received an invalid message (either no opcode, no sender, no net key, or no signature) from a peer")
+	if msg.Opcode == 0 || msg.Sender == nil || msg.Sender.NetKey == nil || len(msg.Sender.Address) == 0 || msg.NetID != common.Parameters.NetworkID {
+		return nil, errors.New("received an invalid message (either no opcode, no sender, no net key, no signature, or networkID invalid) from a peer")
 	}
 	return msg, nil
 }
@@ -124,7 +126,10 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal message")
 	}
-
+	if len(bytes) == 0 {
+		log.Error("(quic)stack info:", fmt.Sprintf("%s", debug.Stack()))
+		return errors.New("quic sendMessage,len(message) is empty")
+	}
 	// Serialize size.
 	buffer := make([]byte, 4)
 	binary.BigEndian.PutUint32(buffer, uint32(len(bytes)))
@@ -140,7 +145,7 @@ func sendMessage(state *ConnState, message proto.Message) error {
 
 	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
 		if err := state.writer.Flush(); err != nil {
-			log.Errorf("stream(common): flush err in sendMessage, err: %+v", err)
+			log.Errorf("quic stream(common): flush err in sendMessage, err: %+v", err)
 			return err
 		}
 	}
@@ -148,14 +153,14 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	for totalBytesWritten < len(buffer) && err == nil {
 		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
 		if err != nil {
-			log.Errorf("stream(common): failed to write entire buffer, err: %+v", err)
+			log.Errorf("quic stream(common): failed to write entire buffer, err: %+v", err)
 			return err
 		}
 		totalBytesWritten += bytesWritten
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "stream: failed to write to socket")
+		return errors.Wrap(err, "quic stream: failed to write to socket")
 	}
 
 	return nil
@@ -174,7 +179,7 @@ func transferQuicRawMessage(message []byte, state *ConnState) error {
 
 	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
 		if err := state.writer.Flush(); err != nil {
-			log.Errorf("stream(raw): transfer quic raw message err: %+v", err)
+			log.Errorf("quic stream(raw): transfer quic raw message err: %+v", err)
 			return err
 		}
 	}
@@ -182,14 +187,14 @@ func transferQuicRawMessage(message []byte, state *ConnState) error {
 	for totalBytesWritten < len(message) && err == nil {
 		bytesWritten, err = state.writer.Write(message[totalBytesWritten:])
 		if err != nil {
-			log.Errorf("stream(raw): failed to write entire buffer, err: %+v", err)
+			log.Errorf("quic stream(raw): failed to write entire buffer, err: %+v", err)
 			return err
 		}
 		totalBytesWritten += bytesWritten
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "stream: failed to write to socket")
+		return errors.Wrap(err, "quic stream: failed to write to socket")
 	}
 
 	return nil

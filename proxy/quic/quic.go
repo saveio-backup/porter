@@ -189,7 +189,7 @@ func (p *QuicProxyServer) monitorPeerStatus() {
 			p.proxies.Range(func(key, value interface{}) bool {
 				if time.Now().After(value.(peer).updateTime.Add(PEER_MONITOR_TIMEOUT)) {
 					p.releasePeerResource(key.(string))
-					log.Info("client has disconnect from proxy server, peerID:", key.(string))
+					log.Info("(quic) client has disconnect from proxy server, peerID:", key.(string))
 				}
 				return true
 			})

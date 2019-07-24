@@ -95,8 +95,8 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal message")
 	}
 	// Check if any of the message headers are invalid or null.
-	if msg.Opcode == 0 || msg.Sender == nil || msg.Sender.NetKey == nil || len(msg.Sender.Address) == 0 {
-		return nil, errors.New("received an invalid message (either no opcode, no sender, no net key, or no signature) from a peer")
+	if msg.Opcode == 0 || msg.Sender == nil || msg.Sender.NetKey == nil || len(msg.Sender.Address) == 0 || msg.NetID != common.Parameters.NetworkID{
+		return nil, errors.New("received an invalid message (either no opcode, no sender, no net key, no signature, or networkID invalid) from a peer")
 	}
 	return msg, nil
 }
