@@ -7,13 +7,14 @@ package main
 
 import (
 	"flag"
+	"os"
+
 	"github.com/saveio/porter/common"
 	kcpProxy "github.com/saveio/porter/proxy/kcp"
 	quicProxy "github.com/saveio/porter/proxy/quic"
 	tcpProxy "github.com/saveio/porter/proxy/tcp"
 	udpProxy "github.com/saveio/porter/proxy/udp"
 	"github.com/saveio/themis/common/log"
-	"os"
 )
 
 func main() {

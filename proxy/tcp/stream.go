@@ -7,16 +7,17 @@ package tcp
 
 import (
 	"encoding/binary"
+	"fmt"
+	"io"
+	"runtime/debug"
+	"sync/atomic"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
-	"io"
-	"sync/atomic"
-	"fmt"
-	"runtime/debug"
 )
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
@@ -95,7 +96,7 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 		return nil, errors.Wrap(err, "failed to unmarshal message")
 	}
 	// Check if any of the message headers are invalid or null.
-	if msg.Opcode == 0 || msg.Sender == nil || msg.Sender.NetKey == nil || len(msg.Sender.Address) == 0 || msg.NetID != common.Parameters.NetworkID{
+	if msg.Opcode == 0 || msg.Sender == nil || msg.Sender.NetKey == nil || len(msg.Sender.Address) == 0 || msg.NetID != common.Parameters.NetworkID {
 		return nil, errors.New("received an invalid message (either no opcode, no sender, no net key, no signature, or networkID invalid) from a peer")
 	}
 	return msg, nil
@@ -115,7 +116,7 @@ func prepareMessage(message proto.Message, state *ConnState) *protobuf.Message {
 	return &protobuf.Message{
 		Opcode:       uint32(opcode),
 		Message:      bytes,
-		Sender:       &protobuf.ID{Address: common.GetPublicHost("tcp"),NetKey:[]byte("PORTER_TCP_NETKEY")},
+		Sender:       &protobuf.ID{Address: common.GetPublicHost("tcp"), NetKey: []byte("PORTER_TCP_NETKEY")},
 		MessageNonce: atomic.AddUint64(&state.messageNonce, 1),
 		NetID:        common.Parameters.NetworkID,
 	}
@@ -126,8 +127,8 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal message")
 	}
-	if len(bytes) == 0{
-		log.Error("stack info:",fmt.Sprintf("%s",debug.Stack()))
+	if len(bytes) == 0 {
+		log.Error("stack info:", fmt.Sprintf("%s", debug.Stack()))
 		return errors.New("tcp sendMessage,len(message) is empty")
 	}
 
@@ -136,7 +137,6 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	binary.BigEndian.PutUint32(buffer, uint32(len(bytes)))
 
 	buffer = append(buffer, bytes...)
-	totalSize := len(buffer)
 
 	// Write until all bytes have been written.
 	bytesWritten, totalBytesWritten := 0, 0
@@ -145,12 +145,6 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	defer state.writerMutex.Unlock()
 
 	//bw, isBuffered := w.(*bufio.Writer)
-	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
-		if err := state.writer.Flush(); err != nil {
-			log.Errorf("tcp stream(common): failed to flush buffer, err: %+v", err)
-			return err
-		}
-	}
 
 	for totalBytesWritten < len(buffer) && err == nil {
 		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
@@ -163,6 +157,11 @@ func sendMessage(state *ConnState, message proto.Message) error {
 
 	if err != nil {
 		return errors.Wrap(err, "tcp stream: failed to write to socket")
+	}
+
+	if err := state.writer.Flush(); err != nil {
+		log.Errorf("tcp stream(common): failed to flush buffer, err: %+v", err)
+		return err
 	}
 
 	return nil
@@ -179,12 +178,6 @@ func transferTcpRawMessage(message []byte, state *ConnState) error {
 	state.writerMutex.Lock()
 	defer state.writerMutex.Unlock()
 
-	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
-		if err := state.writer.Flush(); err != nil {
-			log.Errorf("tcp stream(raw): failed to flush entire buffer, err: %+v", err)
-			return err
-		}
-	}
 	var err error
 	for totalBytesWritten < len(message) && err == nil {
 		bytesWritten, err = state.writer.Write(message[totalBytesWritten:])
@@ -197,6 +190,11 @@ func transferTcpRawMessage(message []byte, state *ConnState) error {
 
 	if err != nil {
 		return errors.Wrap(err, "(tcp) stream: failed to write to socket")
+	}
+
+	if err := state.writer.Flush(); err != nil {
+		log.Errorf("tcp stream(raw): failed to flush entire buffer, err: %+v", err)
+		return err
 	}
 
 	return nil

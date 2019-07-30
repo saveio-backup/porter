@@ -7,12 +7,13 @@ package tcp
 
 import (
 	"encoding/hex"
+	"fmt"
+	"time"
+
+	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
-	"time"
-	"github.com/saveio/porter/common"
-	"fmt"
 )
 
 const writeFLushLatency = 50 * time.Millisecond
@@ -33,13 +34,13 @@ func flushLoop(state *ConnState) {
 	defer t.Stop()
 	for {
 		select {
-		case<-state.stop:
+		case <-state.stop:
 			log.Info("tcp flush loop receive stop signal.")
 			flushOnce(state)
 			return
 		case <-t.C:
 			err := flushOnce(state)
-			if err!=nil{
+			if err != nil {
 				log.Error("(tcp) flush loop err:", err.Error())
 				return
 			}
@@ -50,7 +51,7 @@ func flushLoop(state *ConnState) {
 func (p *TCPProxyServer) releasePeerResource(ConnectionID string) {
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
 		peerInfo.(peer).release.Do(func() {
-			log.Info("release peer resource, connectionID:", ConnectionID)
+			log.Info("release peer resource, proxy-ip:", peerInfo.(peer).addr)
 			close(peerInfo.(peer).stop)
 			close(peerInfo.(peer).state.stop)
 			peerInfo.(peer).conn.Close()
@@ -67,7 +68,7 @@ func (p *TCPProxyServer) handleProxyRequestMessage(message *protobuf.Message, st
 	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
 	state.connectionID = ConnectionID
 	p.listenerBuffer <- peerListen{connectionID: ConnectionID, state: state}
-	go flushLoop(state)
+	//go flushLoop(state)
 }
 
 func (p *TCPProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState) {
@@ -82,10 +83,10 @@ func (p *TCPProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 				loginTime:  peerInfo.(peer).loginTime,
 				stop:       peerInfo.(peer).stop,
 				state:      peerInfo.(peer).state,
-				listener:	peerInfo.(peer).listener,
-				release: 	peerInfo.(peer).release,
+				listener:   peerInfo.(peer).listener,
+				release:    peerInfo.(peer).release,
 			})
-		if err := sendMessage(state, &protobuf.KeepaliveResponse{});err!=nil{
+		if err := sendMessage(state, &protobuf.KeepaliveResponse{}); err != nil {
 			log.Error("tcp handleProxyKeepaliveMessage err:", err.Error())
 		}
 	}
