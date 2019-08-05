@@ -7,28 +7,30 @@ package quic
 
 import (
 	"bufio"
-	"fmt"
-	"github.com/saveio/porter/common"
-	"github.com/saveio/porter/internal/protobuf"
-	"github.com/saveio/themis/common/log"
+	"context"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
+	"math/big"
+	mRand "math/rand"
 	"sync"
 	"time"
+
 	"github.com/lucas-clemente/quic-go"
-	"crypto/tls"
-	"crypto/rsa"
-	"crypto/x509"
-	"math/big"
-	"encoding/pem"
-	mRand "math/rand"
+	"github.com/saveio/porter/common"
+	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
+	"github.com/saveio/themis/common/log"
 )
 
 const (
-	MONITOR_TIME_INTERVAL = 3
-	PEER_MONITOR_TIMEOUT  = 10 * time.Second
-	MESSAGE_CHANNEL_LEN   = 65535
-	LISTEN_CHANNEL_LEN    = 65535
+	MONITOR_TIME_INTERVAL   = 3
+	PEER_MONITOR_TIMEOUT    = 10 * time.Second
+	MESSAGE_CHANNEL_LEN     = 65535
+	LISTEN_CHANNEL_LEN      = 65535
 	DEFAULT_PORT_CACHE_TIME = 7200
 )
 
@@ -64,7 +66,7 @@ type QuicProxyServer struct {
 	ports          port
 	msgBuffer      chan msgNotify
 	listenerBuffer chan peerListen
-	stop 			chan struct{}
+	stop           chan struct{}
 }
 
 type ConnState struct {
@@ -86,7 +88,7 @@ func Init() *QuicProxyServer {
 		proxies:        new(sync.Map),
 		msgBuffer:      make(chan msgNotify, MESSAGE_CHANNEL_LEN),
 		listenerBuffer: make(chan peerListen, LISTEN_CHANNEL_LEN),
-		stop:			make(chan struct{}),
+		stop:           make(chan struct{}),
 	}
 }
 
@@ -97,7 +99,7 @@ func newConnState(listenr quic.Stream, addr string) *ConnState {
 		messageNonce: 0,
 		writerMutex:  new(sync.Mutex),
 		stop:         make(chan struct{}),
-		remoteAddr:	  addr,
+		remoteAddr:   addr,
 	}
 }
 
@@ -119,7 +121,7 @@ func generateTLSConfig() *tls.Config {
 	if err != nil {
 		panic(err)
 	}
-	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, NextProtos:[]string{"quic-proxy"}}
+	return &tls.Config{Certificates: []tls.Certificate{tlsCert}, NextProtos: []string{"quic-proxy"}}
 }
 
 // Listen listens for incoming quic connections on a specified port.
@@ -151,31 +153,31 @@ func (p *QuicProxyServer) quicServerListenAndAccept(ip string, port uint16) {
 
 func (p *QuicProxyServer) serverAccept() error {
 	for {
-		conn, err := p.mainListener.Accept()
+		conn, err := p.mainListener.Accept(context.Background())
 		if err != nil {
 			log.Error("quic listener accept error:", err.Error(), "listen addr:", p.mainListener.Addr().String())
 			continue
 		}
-		stream, err:= conn.AcceptStream()
-		if err!=nil{
-			log.Error("quic accept stream err:", err.Error(), "listen addr:",p.mainListener.Addr().String())
+		stream, err := conn.AcceptStream(context.Background())
+		if err != nil {
+			log.Error("quic accept stream err:", err.Error(), "listen addr:", p.mainListener.Addr().String())
 			conn.Close()
 			continue
 		}
 		go func(stream quic.Stream, conn quic.Session) {
-			connState := newConnState(stream,conn.RemoteAddr().String())
+			connState := newConnState(stream, conn.RemoteAddr().String())
 			for {
 				message, err := receiveMessage(connState)
 				if nil == message || err != nil {
-					log.Error("quic receive message goroutine err:", err.Error(), "listen remote addr:",conn.RemoteAddr().String())
+					log.Error("quic receive message goroutine err:", err.Error(), "listen remote addr:", conn.RemoteAddr().String())
 					p.releasePeerResource(connState.connectionID)
 					break
 				}
-				if message.Opcode == uint32(opcode.ProxyRequestCode) || message.Opcode == uint32(opcode.KeepaliveCode){
+				if message.Opcode == uint32(opcode.ProxyRequestCode) || message.Opcode == uint32(opcode.KeepaliveCode) {
 					p.msgBuffer <- msgNotify{message: message, state: connState}
 				}
 			}
-		}(stream,conn)
+		}(stream, conn)
 	}
 	close(p.stop)
 	return nil
@@ -194,13 +196,13 @@ func (p *QuicProxyServer) monitorPeerStatus() {
 				return true
 			})
 
-			timeout:=common.Parameters.PortTimeout
-			if common.Parameters.PortTimeout<=0{
+			timeout := common.Parameters.PortTimeout
+			if common.Parameters.PortTimeout <= 0 {
 				timeout = DEFAULT_PORT_CACHE_TIME
 			}
 			common.PortSet.Cache.Range(func(key, value interface{}) bool {
-				if time.Now().After(value.(*common.UsingPort).Timestamp.Add(timeout*time.Second)){
-					common.PortSet.Cache.Delete(fmt.Sprintf("%s-%s",value.(*common.UsingPort).Protocol,value.(*common.UsingPort).ConnectionID))
+				if time.Now().After(value.(*common.UsingPort).Timestamp.Add(timeout * time.Second)) {
+					common.PortSet.Cache.Delete(fmt.Sprintf("%s-%s", value.(*common.UsingPort).Protocol, value.(*common.UsingPort).ConnectionID))
 				}
 				return true
 			})
@@ -211,5 +213,5 @@ func (p *QuicProxyServer) monitorPeerStatus() {
 func (p *QuicProxyServer) StartQuicServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.quicServerListenAndAccept(common.GetLocalIP(), port)
-	<- make(chan struct{})
+	<-make(chan struct{})
 }

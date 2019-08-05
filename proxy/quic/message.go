@@ -7,12 +7,13 @@ package quic
 
 import (
 	"encoding/hex"
+	"fmt"
+	"time"
+
+	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
-	"time"
-	"fmt"
-	"github.com/saveio/porter/common"
 )
 
 const writeFLushLatency = 50 * time.Millisecond
@@ -33,13 +34,13 @@ func flushLoop(state *ConnState) {
 	defer t.Stop()
 	for {
 		select {
-		case<-state.stop:
+		case <-state.stop:
 			log.Info("flush loop receive stop signal.")
 			flushOnce(state)
 			return
 		case <-t.C:
 			err := flushOnce(state)
-			if err!=nil{
+			if err != nil {
 				log.Error("(quic) flushloop err:", err.Error())
 				return
 			}
@@ -82,11 +83,11 @@ func (p *QuicProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message,
 				loginTime:  peerInfo.(peer).loginTime,
 				stop:       peerInfo.(peer).stop,
 				state:      peerInfo.(peer).state,
-				listener:	peerInfo.(peer).listener,
-				release: 	peerInfo.(peer).release,
+				listener:   peerInfo.(peer).listener,
+				release:    peerInfo.(peer).release,
 			})
-		err:=sendMessage(state, &protobuf.KeepaliveResponse{})
-		if err!=nil{
+		err := sendMessage(state, &protobuf.KeepaliveResponse{})
+		if err != nil {
 			log.Error("(quic) handle proxyKeepaliveMessage when send, error:", err.Error())
 		}
 	}

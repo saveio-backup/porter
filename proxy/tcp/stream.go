@@ -32,7 +32,7 @@ func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
 	for totalBytesRead < 4 && err == nil {
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("tcp receive raw message body err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
+			log.Error("tcp receive raw message head err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -46,7 +46,7 @@ func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("tcp receive raw message body err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
+			log.Error("tcp receive raw message body err:", err.Error(), "has read buffer message:", buffer[:totalBytesRead+bytesRead], "buffer.len:", bytesRead, "total message body size:", size)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -68,7 +68,7 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	for totalBytesRead < 4 && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("tcp receive message body err:", err.Error(), "has read buffer message:", buffer, "buffer.len:", bytesRead)
+			log.Error("tcp receive message head err:", err.Error(), "has read buffer message:", buffer, "buffer.len:", bytesRead)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -83,7 +83,7 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("tcp receive message body err:", err.Error(), "has read buffer message:", buffer, "buffer.len:", bytesRead)
+			log.Error("tcp receive message body err:", err.Error(), "has read buffer message:", buffer[:totalBytesRead+bytesRead], "buffer.len:", bytesRead, "total message body size:", size)
 			return nil, err
 		}
 		totalBytesRead += bytesRead

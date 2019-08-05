@@ -10,8 +10,9 @@
     "QPort":6008,
     "TPort":6008,
     "PortTimeout":180,
-    "NetworkID":0,
+    "NetworkID":1564141146,
     "LogDir":"./",
-    "LogLevel":1
+    "LogLevel":1,
+    "PorterDBPath":"./porterdb"
   }
 }

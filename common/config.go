@@ -34,6 +34,7 @@ type Configuration struct {
 	NetworkID       uint32        `json:"NetworkID"`
 	LogDir          string        `json:"LogDir"`
 	LogLevel        int           `json:"LogLevel"`
+	PorterDBPath    string        `json:"PorterDBPath"`
 }
 
 type ConfigFile struct {

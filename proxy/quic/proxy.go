@@ -7,12 +7,15 @@ package quic
 
 import (
 	"fmt"
+	"sync"
+	"time"
+
+	"context"
+
 	"github.com/lucas-clemente/quic-go"
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/themis/common/log"
-	"sync"
-	"time"
 )
 
 func (p *QuicProxyServer) startListenScheduler() {
@@ -64,12 +67,12 @@ func (p *QuicProxyServer) proxyListenAndAccept(connectionID string, state *ConnS
 }
 
 func (p *QuicProxyServer) onceAccept(peerInfo peer, connectionID string) error {
-	conn, err := peerInfo.listener.Accept()
+	conn, err := peerInfo.listener.Accept(context.Background())
 	if err != nil {
 		log.Error("(quic) peer proxy accept err:", err.Error(), "listen ip", peerInfo.listener.Addr().String())
 		return err
 	}
-	stream, err := conn.AcceptStream()
+	stream, err := conn.AcceptStream(context.Background())
 	go func(stream quic.Stream, conn quic.Session) {
 		defer stream.Close()
 		defer conn.Close()

@@ -1,17 +1,18 @@
 /**
  * Description:
  * Author: Yihen.Liu
- * Create: 2019-07-23 
-*/
+ * Create: 2019-07-23
+ */
 package common
 
 import (
 	"time"
+
 	"github.com/saveio/themis/common/log"
 )
 
 func CheckLogFileSize() {
-	ti := time.NewTicker(time.Second)
+	ti := time.NewTicker(time.Minute)
 	for {
 		select {
 		case <-ti.C:

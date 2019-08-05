@@ -7,11 +7,12 @@ package common
 
 import (
 	"fmt"
-	"github.com/saveio/themis/common/log"
 	"math/rand"
+	"net"
 	"sync"
 	"time"
-	"net"
+
+	"github.com/saveio/themis/common/log"
 )
 
 const DEFAULT_PORT_CACHE_TIME = 7200
@@ -24,7 +25,7 @@ type protocols struct {
 }
 
 type UsingPort struct {
-	Timestamp     time.Time
+	Timestamp    time.Time
 	ConnectionID string
 	Port         uint16
 	Protocol     string
@@ -36,14 +37,15 @@ type Ports struct {
 	ranges     int
 	WriteMutex *sync.Mutex
 	Cache      *sync.Map
+	PorterDB   *PorterDB
 }
 
 var PortSet Ports
 
 func RandomPort(protocol string, connectionID string) uint16 {
 	PortSet.WriteMutex.Lock()
-	timeout:=Parameters.PortTimeout
-	if Parameters.PortTimeout<=0 {
+	timeout := Parameters.PortTimeout
+	if Parameters.PortTimeout <= 0 {
 		timeout = DEFAULT_PORT_CACHE_TIME
 	}
 
@@ -68,8 +70,8 @@ func RandomPort(protocol string, connectionID string) uint16 {
 			case "kcp":
 				PortSet.usingPorts.Store(port, protocols{kcp: true})
 			case "tcp":
-				conn, err:=net.Dial(protocol,fmt.Sprintf("%s:%d",GetLocalIP(),port))
-				if conn!=nil && err==nil {
+				conn, err := net.Dial(protocol, fmt.Sprintf("%s:%d", GetLocalIP(), port))
+				if conn != nil && err == nil {
 					log.Error("What a superise, another goroutine is using the same port:", port)
 					conn.Close()
 					continue
@@ -98,5 +100,6 @@ func InitPorts() {
 		usingPorts: new(sync.Map),
 		WriteMutex: new(sync.Mutex),
 		Cache:      new(sync.Map),
+		PorterDB:   OpenPorterDB(Parameters.PorterDBPath),
 	}
 }

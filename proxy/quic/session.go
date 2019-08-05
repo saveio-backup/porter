@@ -8,15 +8,16 @@ package quic
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
+	"runtime/debug"
+	"sync/atomic"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
-	"io"
-	"runtime/debug"
-	"sync/atomic"
 )
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
@@ -48,7 +49,7 @@ func receiveQuicRawMessage(state *ConnState) ([]byte, error) {
 		//bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("quic receive message head err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
+			log.Error("quic receive message head err:", err.Error(), "has read buffer message:", buffer[:totalBytesRead+bytesRead], "buffer.len:", bytesRead, "total message body size:", size)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -82,7 +83,7 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("quic receive message body err:", err.Error(), "has read buffer message:", buffer, "buffer.len:", bytesRead)
+			log.Error("quic receive message body err:", err.Error(), "has read buffer message:", buffer[:totalBytesRead+bytesRead], "buffer.len:", bytesRead, "total message body size:", size)
 			return nil, err
 		}
 		totalBytesRead += bytesRead

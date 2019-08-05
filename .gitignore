@@ -4,3 +4,4 @@ main
 porter
 vendor/
 *.log
+porterdb

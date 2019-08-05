@@ -7,7 +7,6 @@ package main
 
 import (
 	"flag"
-	"os"
 
 	"github.com/saveio/porter/common"
 	kcpProxy "github.com/saveio/porter/proxy/kcp"
@@ -20,8 +19,12 @@ import (
 func main() {
 	protocol := flag.String("protocol", "", "protocol to use (kcp/tcp/udp)")
 	flag.Parse()
-	log.InitLog(common.Parameters.LogLevel, common.GetLogDir(), os.Stdout)
+
+	log.InitLog(common.Parameters.LogLevel, common.GetLogDir(), log.Stdout)
+	go common.CheckLogFileSize()
+
 	log.Debug("porter version:", common.Version)
+
 	switch *protocol {
 	case "udp":
 		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
@@ -37,7 +40,5 @@ func main() {
 		quicProxy.Init().StartQuicServer(uint16(common.GetPortFromParamsByProtocol("quic")))
 		tcpProxy.Init().StartTCPServer(uint16(common.GetPortFromParamsByProtocol("tcp")))
 	}
-
-	go common.CheckLogFileSize()
 	select {}
 }
