@@ -7,16 +7,17 @@ package kcp
 
 import (
 	"bufio"
+	"encoding/hex"
 	"fmt"
-	"github.com/saveio/porter/common"
-	"github.com/saveio/porter/internal/protobuf"
-	"github.com/saveio/themis/common/log"
-	"github.com/xtaci/kcp-go"
 	"math/rand"
 	"net"
 	"sync"
 	"time"
-	"encoding/hex"
+
+	"github.com/saveio/porter/common"
+	"github.com/saveio/porter/internal/protobuf"
+	"github.com/saveio/themis/common/log"
+	"github.com/xtaci/kcp-go"
 )
 
 const (
@@ -105,7 +106,7 @@ func (p *KcpProxyServer) kcpServerListenAndAccept(ip string, port uint16) {
 	var err error
 	p.mainListener, err = listen(ip, port)
 	if err != nil {
-		log.Errorf("kcp server listen start ERROR:", err.Error(), "listen(IP/PORT):%s,%d",ip,port)
+		log.Errorf("kcp server listen start ERROR:", err.Error(), "listen(IP/PORT):%s,%d", ip, port)
 	} else {
 		log.Info("Kcp Proxy Listen IP:", p.mainListener.Addr().String())
 	}
@@ -119,14 +120,14 @@ func (p *KcpProxyServer) serverAccept() error {
 		conn, err := p.mainListener.Accept()
 		if err != nil {
 			log.Error("kcp listener accept error:", err.Error())
-		}else {
-			log.Info("Kcp main listener accept a client connection, client-addr:",conn.RemoteAddr().String())
+		} else {
+			log.Info("Kcp main listener accept a client connection, client-addr:", conn.RemoteAddr().String())
 		}
 		go func() {
 			connState := newConnState(conn)
 			for {
 				message, err := receiveMessage(connState)
-				log.Infof("accept kcp connection(remote addr:%s) receive a message, message.opcode:%d,message.Sender.Addr:%s, message.sign:%s",conn.RemoteAddr().String(), message.Opcode, message.Sender.Address, hex.EncodeToString(message.Signature))
+				log.Infof("accept kcp connection(remote addr:%s) receive a message, message.opcode:%d,message.Sender.Addr:%s, message.sign:%s", conn.RemoteAddr().String(), message.Opcode, message.Sender.Address, hex.EncodeToString(message.Signature))
 				if nil == message || err != nil {
 					break
 				}
@@ -156,5 +157,5 @@ func (p *KcpProxyServer) monitorPeerStatus() {
 func (p *KcpProxyServer) StartKCPServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.kcpServerListenAndAccept(common.GetLocalIP(), port)
-	<- make(chan struct{})
+	<-make(chan struct{})
 }

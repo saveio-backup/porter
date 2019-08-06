@@ -8,12 +8,13 @@ package udp
 import (
 	"encoding/binary"
 	"fmt"
+	"net"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
-	"net"
 )
 
 func receiveUDPRawMessage(conn *net.UDPConn) ([]byte, error) {
@@ -66,7 +67,7 @@ func prepareMessage(message proto.Message) []byte {
 	return buffer
 }
 
-func sendUDPMessage(message proto.Message, udpConn *net.UDPConn, remoteAddr string) error{
+func sendUDPMessage(message proto.Message, udpConn *net.UDPConn, remoteAddr string) error {
 	addrInfo, err := common.ParseAddress(remoteAddr)
 	resolved, err := net.ResolveUDPAddr("udp", addrInfo.ToString())
 	if err != nil {

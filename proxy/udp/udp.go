@@ -7,14 +7,15 @@ package udp
 
 import (
 	"fmt"
-	"github.com/saveio/porter/common"
-	"github.com/saveio/porter/types/opcode"
-	"github.com/saveio/themis/common/log"
 	"math/rand"
 	"net"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/saveio/porter/common"
+	"github.com/saveio/porter/types/opcode"
+	"github.com/saveio/themis/common/log"
 )
 
 const (
@@ -159,5 +160,5 @@ func (p *ProxyServer) monitorPeerStatus() {
 func (p *ProxyServer) StartUDPServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.serverListenAndAccept(common.GetLocalIP(), port)
-	<- make(chan struct{})
+	<-make(chan struct{})
 }

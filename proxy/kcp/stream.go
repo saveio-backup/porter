@@ -8,13 +8,14 @@ package kcp
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"sync/atomic"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
-	"sync/atomic"
 )
 
 const defaultRecvBufferSize = 4 * 1024 * 1024

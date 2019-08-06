@@ -7,11 +7,12 @@ package udp
 
 import (
 	"encoding/hex"
+	"fmt"
+	"time"
+
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/themis/common/log"
-	"time"
-	"fmt"
 )
 
 func (p *ProxyServer) handleProxyRequestMessage(message *protobuf.Message, remoteAddr string) {
@@ -53,8 +54,8 @@ func (p *ProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message) {
 				loginTime:  peerInfo.(peer).loginTime,
 				stop:       peerInfo.(peer).stop,
 			})
-		err:=sendUDPMessage(&protobuf.KeepaliveResponse{}, p.listener, peerInfo.(peer).addr)
-		if err!=nil{
+		err := sendUDPMessage(&protobuf.KeepaliveResponse{}, p.listener, peerInfo.(peer).addr)
+		if err != nil {
 			log.Error("(quic) handle proxyKeepaliveMessage when send, error:", err.Error())
 		}
 	}

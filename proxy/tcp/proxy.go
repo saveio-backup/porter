@@ -7,12 +7,13 @@ package tcp
 
 import (
 	"fmt"
-	"github.com/saveio/porter/common"
-	"github.com/saveio/themis/common/log"
-	"time"
-	"github.com/saveio/porter/internal/protobuf"
 	"net"
 	"sync"
+	"time"
+
+	"github.com/saveio/porter/common"
+	"github.com/saveio/porter/internal/protobuf"
+	"github.com/saveio/themis/common/log"
 )
 
 func (p *TCPProxyServer) startListenScheduler() {
@@ -20,19 +21,19 @@ func (p *TCPProxyServer) startListenScheduler() {
 		select {
 		case item := <-p.listenerBuffer:
 			var proxyIP string
-			if value, ok:=p.proxies.Load(item.connectionID);!ok{
+			if value, ok := p.proxies.Load(item.connectionID); !ok {
 				proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
 				if "" == proxyIP {
 					log.Error("in startListenScheduler, listen and accept get nil proxyIP value")
 					continue
 				}
-				if err:= sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP});err!=nil{
-					log.Error("tcp proxy handle listen scheduler err:",err.Error())
+				if err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP}); err != nil {
+					log.Error("tcp proxy handle listen scheduler err:", err.Error())
 				}
-			}else{
+			} else {
 				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist.", item.connectionID, value.(peer).addr))
-				if err:= sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: value.(peer).addr});err!=nil{
-					log.Error("tcp proxy handle listen scheduler when re-sent, err:",err.Error())
+				if err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: value.(peer).addr}); err != nil {
+					log.Error("tcp proxy handle listen scheduler when re-sent, err:", err.Error())
 				}
 			}
 		case <-p.stop:
@@ -42,13 +43,13 @@ func (p *TCPProxyServer) startListenScheduler() {
 }
 
 func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnState) string {
-	port := common.RandomPort("tcp",connectionID)
+	port := common.RandomPort("tcp", connectionID)
 	listener, err := listen(common.GetLocalIP(), port)
 	if err != nil {
 		log.Error("proxy listen server start ERROR:", err.Error())
 		return ""
-	}else {
-		log.Info("listen to server",listener.Addr().String())
+	} else {
+		log.Info("listen to server:", listener.Addr().String())
 	}
 
 	peerInfo := peer{addr: fmt.Sprintf("%s:%d", common.GetPublicIP(), port),
@@ -58,7 +59,7 @@ func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnSt
 		loginTime:  time.Now(),
 		updateTime: time.Now(),
 		stop:       make(chan struct{}),
-		release:  	new(sync.Once),
+		release:    new(sync.Once),
 	}
 	p.proxies.Store(connectionID, peerInfo)
 
@@ -66,16 +67,16 @@ func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnSt
 	return fmt.Sprintf("%s:%d", common.GetPublicIP(), port)
 }
 
-func(p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error{
+func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 	conn, err := peerInfo.listener.Accept()
 	if err != nil {
-		log.Error("peer proxy accept err:", err.Error(), "listen ip", peerInfo.listener.Addr().String())
+		log.Error("peer proxy accept err:", err.Error(), ",listen ip:", peerInfo.listener.Addr().String())
 		return err
 	}
 	go func(conn net.Conn) {
 		defer conn.Close()
 		//defer p.releasePeerResource(connectionID) //不要releasePeerResource， 只释放掉出问题的连接即可，不要释放无关连接；
-		connState := newConnState(conn,"")
+		connState := newConnState(conn, "")
 		close(connState.stop) //connState.stop没有使用，可以立刻关闭;
 		for {
 			select {
@@ -84,13 +85,13 @@ func(p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error{
 				return
 			default:
 				buffer, err := receiveTcpRawMessage(connState)
-				if 0 == len(buffer) || nil == buffer{
+				if 0 == len(buffer) || nil == buffer {
 					log.Warn("(tcp) onceAccept groutine, receive empty message")
 					return
 				}
 				err = transferTcpRawMessage(buffer, peerInfo.state)
-				if err!=nil {
-					log.Warn("transfer tcp raw message err:", err.Error(),"addr:", peerInfo.listener.Addr().String())
+				if err != nil {
+					log.Warn("transfer tcp raw message err:", err.Error(), "addr:", peerInfo.listener.Addr().String())
 					return
 				}
 			}
@@ -106,8 +107,9 @@ func (p *TCPProxyServer) proxyAccept(peerInfo peer, connectionID string) error {
 			log.Info("peerInfo receive stop signal, exit now.")
 			return nil
 		default:
-			if err:= p.onceAccept(peerInfo, connectionID); err!=nil{
-				log.Error("proxyAccept run err when gothrough onceAccept, err:",err.Error())
+			if err := p.onceAccept(peerInfo, connectionID); err != nil {
+				log.Error("proxyAccept run err when gothrough onceAccept, err:", err.Error())
+				p.releasePeerResource(connectionID)
 				return err
 			}
 		}

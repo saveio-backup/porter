@@ -98,11 +98,6 @@ func (p *TCPProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 	}
 }
 
-func (p *TCPProxyServer) handleDisconnectMessage(message *protobuf.Message) {
-	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
-	p.releasePeerResource(ConnectionID)
-}
-
 func (p *TCPProxyServer) handleControlMessage() {
 	for {
 		select {
@@ -112,8 +107,6 @@ func (p *TCPProxyServer) handleControlMessage() {
 				p.handleProxyRequestMessage(item.message, item.state)
 			case uint32(opcode.KeepaliveCode):
 				p.handleProxyKeepaliveMessage(item.message, item.state)
-			case uint32(opcode.DisconnectCode):
-				p.handleDisconnectMessage(item.message)
 			default:
 				//log.Warn("please send correct control message type, include ProxyRequest/Keepalive/Disconnect, message.opcode:", item.message.Opcode, "send to ip:",item.message.Sender.Address)
 			}

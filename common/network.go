@@ -7,10 +7,11 @@ package common
 
 import (
 	"fmt"
-	"github.com/saveio/themis/common/log"
 	"net"
 	"os"
 	"strings"
+
+	"github.com/saveio/themis/common/log"
 )
 
 func getDefaultIP() string {

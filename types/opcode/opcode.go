@@ -7,10 +7,11 @@ package opcode
 
 import (
 	"errors"
-	"github.com/golang/protobuf/proto"
-	"github.com/saveio/porter/internal/protobuf"
 	"reflect"
 	"sync"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/saveio/porter/internal/protobuf"
 )
 
 func init() {

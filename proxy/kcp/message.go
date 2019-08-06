@@ -7,12 +7,13 @@ package kcp
 
 import (
 	"encoding/hex"
+	"fmt"
+	"time"
+
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
 	"github.com/saveio/themis/common/log"
-	"time"
-	"fmt"
 )
 
 const writeFLushLatency = 10 * time.Millisecond
@@ -54,7 +55,7 @@ func (p *KcpProxyServer) handleProxyRequestMessage(message *protobuf.Message, st
 			log.Error("parse remoteAddr err:", err.Error())
 			return
 		}
-		log.Infof("remote node is working in public-net env, return ip address directly. addr:%s",message.Sender.Address)
+		log.Infof("remote node is working in public-net env, return ip address directly. addr:%s", message.Sender.Address)
 		sendMessage(state, &protobuf.ProxyResponse{ProxyAddress: addrInfo.ToString()})
 		return
 	}
@@ -77,8 +78,8 @@ func (p *KcpProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 				stop:       peerInfo.(peer).stop,
 				state:      peerInfo.(peer).state,
 			})
-		err:=sendMessage(state, &protobuf.KeepaliveResponse{})
-		if err!=nil{
+		err := sendMessage(state, &protobuf.KeepaliveResponse{})
+		if err != nil {
 			log.Error("(quic) handle proxyKeepaliveMessage when send, error:", err.Error())
 		}
 	}

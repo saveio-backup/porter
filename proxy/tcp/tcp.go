@@ -8,22 +8,23 @@ package tcp
 import (
 	"bufio"
 	"fmt"
-	"github.com/saveio/porter/common"
-	"github.com/saveio/porter/internal/protobuf"
-	"github.com/saveio/themis/common/log"
-	"sync"
-	"time"
 	mRand "math/rand"
 	"net"
+	"sync"
+	"time"
+
+	"github.com/saveio/porter/common"
+	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
+	"github.com/saveio/themis/common/log"
 )
 
 const (
-	MONITOR_TIME_INTERVAL = 60
-	PEER_MONITOR_TIMEOUT  = 180 * time.Second
+	MONITOR_TIME_INTERVAL   = 60
+	PEER_MONITOR_TIMEOUT    = 180 * time.Second
 	DEFAULT_PORT_CACHE_TIME = 7200
-	MESSAGE_CHANNEL_LEN   = 65535
-	LISTEN_CHANNEL_LEN    = 65535
+	MESSAGE_CHANNEL_LEN     = 65535
+	LISTEN_CHANNEL_LEN      = 65535
 )
 
 type port struct {
@@ -58,7 +59,7 @@ type TCPProxyServer struct {
 	ports          port
 	msgBuffer      chan msgNotify
 	listenerBuffer chan peerListen
-	stop 			chan struct{}
+	stop           chan struct{}
 }
 
 type ConnState struct {
@@ -80,7 +81,7 @@ func Init() *TCPProxyServer {
 		proxies:        new(sync.Map),
 		msgBuffer:      make(chan msgNotify, MESSAGE_CHANNEL_LEN),
 		listenerBuffer: make(chan peerListen, LISTEN_CHANNEL_LEN),
-		stop:			make(chan struct{}),
+		stop:           make(chan struct{}),
 	}
 }
 
@@ -91,7 +92,7 @@ func newConnState(listenr net.Conn, addr string) *ConnState {
 		messageNonce: 0,
 		writerMutex:  new(sync.Mutex),
 		stop:         make(chan struct{}),
-		remoteAddr:	  addr,
+		remoteAddr:   addr,
 	}
 }
 
@@ -129,16 +130,23 @@ func (p *TCPProxyServer) serverAccept() error {
 			continue
 		}
 		go func(conn net.Conn) {
-			connState := newConnState(conn,conn.RemoteAddr().String())
+			connState := newConnState(conn, conn.RemoteAddr().String())
+			firstInboundMsg := true
 			for {
 				message, err := receiveMessage(connState)
 				if nil == message || err != nil {
-					log.Warn("tcp receive message goroutine err:", err.Error(), "listen remote addr:",conn.RemoteAddr().String())
-					p.releasePeerResource(connState.connectionID)
+					log.Warn("tcp receive message goroutine err:", err.Error(), "listen remote addr:", conn.RemoteAddr().String())
+					if firstInboundMsg == true {
+						log.Error("first inbound message is error, connection will be closed immediately.")
+						conn.Close()
+					} else {
+						p.releasePeerResource(connState.connectionID)
+					}
 					break
 				}
 				if message.Opcode == uint32(opcode.ProxyRequestCode) || message.Opcode == uint32(opcode.KeepaliveCode) {
 					p.msgBuffer <- msgNotify{message: message, state: connState}
+					firstInboundMsg = false
 				}
 			}
 		}(conn)
@@ -160,13 +168,13 @@ func (p *TCPProxyServer) monitorPeerStatus() {
 				return true
 			})
 
-			timeout:=common.Parameters.PortTimeout
-			if common.Parameters.PortTimeout<=0{
+			timeout := common.Parameters.PortTimeout
+			if common.Parameters.PortTimeout <= 0 {
 				timeout = DEFAULT_PORT_CACHE_TIME
 			}
 			common.PortSet.Cache.Range(func(key, value interface{}) bool {
-				if time.Now().After(value.(*common.UsingPort).Timestamp.Add(timeout*time.Second)){
-					common.PortSet.Cache.Delete(fmt.Sprintf("%s-%s",value.(*common.UsingPort).Protocol,value.(*common.UsingPort).ConnectionID))
+				if time.Now().After(value.(*common.UsingPort).Timestamp.Add(timeout * time.Second)) {
+					common.PortSet.Cache.Delete(fmt.Sprintf("%s-%s", value.(*common.UsingPort).Protocol, value.(*common.UsingPort).ConnectionID))
 				}
 				return true
 			})
@@ -177,5 +185,5 @@ func (p *TCPProxyServer) monitorPeerStatus() {
 func (p *TCPProxyServer) StartTCPServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.tcpServerListenAndAccept(common.GetLocalIP(), port)
-	<- make(chan struct{})
+	<-make(chan struct{})
 }
