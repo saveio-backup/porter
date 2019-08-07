@@ -63,8 +63,8 @@ func (p *ProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message) {
 	key := fmt.Sprintf("udp-%s", ConnectionID)
 	if port, ok := common.PortSet.Cache.Load(key); ok {
 		port.(*common.UsingPort).Timestamp = time.Now()
-		common.PortSet.WriteMutex.Unlock()
 	}
+	common.PortSet.WriteMutex.Unlock()
 }
 
 func (p *ProxyServer) releasePeerResource(ConnectionID string) {

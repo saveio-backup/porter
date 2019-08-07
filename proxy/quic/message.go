@@ -95,8 +95,8 @@ func (p *QuicProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message,
 	key := fmt.Sprintf("quic-%s", ConnectionID)
 	if port, ok := common.PortSet.Cache.Load(key); ok {
 		port.(*common.UsingPort).Timestamp = time.Now()
-		common.PortSet.WriteMutex.Unlock()
 	}
+	common.PortSet.WriteMutex.Unlock()
 }
 
 func (p *QuicProxyServer) handleDisconnectMessage(message *protobuf.Message) {

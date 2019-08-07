@@ -49,7 +49,7 @@ func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnSt
 		log.Error("proxy listen server start ERROR:", err.Error())
 		return ""
 	} else {
-		log.Info("listen to server:", listener.Addr().String())
+		log.Infof("start proxyListen for inbound proxy apply(remote-ip:%s), proxy-ip/port:%d", state.conn.RemoteAddr(), listener.Addr().String())
 	}
 
 	peerInfo := peer{addr: fmt.Sprintf("%s:%d", common.GetPublicIP(), port),
@@ -72,6 +72,8 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 	if err != nil {
 		log.Error("peer proxy accept err:", err.Error(), ",listen ip:", peerInfo.listener.Addr().String())
 		return err
+	} else {
+		log.Info("accept a new inbound connection to proxy server:", peerInfo.addr, "remote client addr:", conn.RemoteAddr().String())
 	}
 	go func(conn net.Conn) {
 		defer conn.Close()
@@ -81,17 +83,24 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 		for {
 			select {
 			case <-peerInfo.state.stop:
-				log.Info("goroutine exit, listen ip is ", peerInfo.listener.Addr().String())
+				log.Info("goroutine exit, listen ip is: ", peerInfo.addr)
 				return
 			default:
-				buffer, err := receiveTcpRawMessage(connState)
+				buffer, err := receiveTcpRawMessage(connState, peerInfo.addr)
 				if 0 == len(buffer) || nil == buffer {
-					log.Warn("(tcp) onceAccept groutine, receive empty message")
+					log.Error("(tcp) onceAccept groutine, receive empty message. proxy listen server/ip:", peerInfo.addr,
+						"remote client addr:", conn.RemoteAddr().String())
+					return
+				}
+				if err != nil {
+					log.Error("(tcp) onceAccept goroutine receiveTcpRawMsg err:", err.Error(), "proxy listen server/ip:",
+						peerInfo.addr, "remote client addr:", conn.RemoteAddr().String())
 					return
 				}
 				err = transferTcpRawMessage(buffer, peerInfo.state)
 				if err != nil {
-					log.Warn("transfer tcp raw message err:", err.Error(), "addr:", peerInfo.listener.Addr().String())
+					log.Error("transfer tcp raw message err:", err.Error(), "proxy listen server/ip addr:", peerInfo.addr,
+						"remote client addr:", conn.RemoteAddr().String())
 					return
 				}
 			}

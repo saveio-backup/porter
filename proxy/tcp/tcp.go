@@ -130,6 +130,7 @@ func (p *TCPProxyServer) serverAccept() error {
 			continue
 		}
 		go func(conn net.Conn) {
+			log.Info("start a new goroutine for new Inbound connection in main proxy server accept, remote addr:", conn.RemoteAddr().String())
 			connState := newConnState(conn, conn.RemoteAddr().String())
 			firstInboundMsg := true
 			for {
@@ -144,6 +145,8 @@ func (p *TCPProxyServer) serverAccept() error {
 					}
 					break
 				}
+				log.Info("receive a new message which need to be controll message type in main Accept, message.opcode:",
+					message.Opcode, "netID:", message.NetID, "sender address:", message.Sender.Address)
 				if message.Opcode == uint32(opcode.ProxyRequestCode) || message.Opcode == uint32(opcode.KeepaliveCode) {
 					p.msgBuffer <- msgNotify{message: message, state: connState}
 					firstInboundMsg = false
@@ -163,7 +166,8 @@ func (p *TCPProxyServer) monitorPeerStatus() {
 			p.proxies.Range(func(key, value interface{}) bool {
 				if time.Now().After(value.(peer).updateTime.Add(PEER_MONITOR_TIMEOUT)) {
 					p.releasePeerResource(key.(string))
-					log.Info("client has disconnect from proxy server, peerID:", key.(string))
+					log.Info("client has disconnect from proxy server as for monitor timeout, proxy-addr:", value.(peer).addr,
+						",monitor timeout second:", PEER_MONITOR_TIMEOUT, ",lastst update time:", value.(peer).updateTime)
 				}
 				return true
 			})
@@ -174,7 +178,9 @@ func (p *TCPProxyServer) monitorPeerStatus() {
 			}
 			common.PortSet.Cache.Range(func(key, value interface{}) bool {
 				if time.Now().After(value.(*common.UsingPort).Timestamp.Add(timeout * time.Second)) {
-					common.PortSet.Cache.Delete(fmt.Sprintf("%s-%s", value.(*common.UsingPort).Protocol, value.(*common.UsingPort).ConnectionID))
+					delKey := fmt.Sprintf("%s-%s", value.(*common.UsingPort).Protocol, value.(*common.UsingPort).ConnectionID)
+					common.PortSet.Cache.Delete(delKey)
+					log.Infof("proxy port timeout in memory cache:", delKey, " delete now. latest timestamp:", value.(*common.UsingPort).Timestamp)
 				}
 				return true
 			})

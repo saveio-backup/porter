@@ -74,6 +74,8 @@ func (p *TCPProxyServer) handleProxyRequestMessage(message *protobuf.Message, st
 func (p *TCPProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState) {
 	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
+		log.Info("tcp proxy server receive a keepalive message, proxy addr:", peerInfo.(peer).addr, "remote addr:",
+			peerInfo.(peer).conn.RemoteAddr().String(), "loginTime:", peerInfo.(peer).loginTime, "latest upateTime:", peerInfo.(peer).updateTime)
 		p.proxies.Delete(ConnectionID)
 		p.proxies.Store(ConnectionID,
 			peer{
@@ -91,10 +93,10 @@ func (p *TCPProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 		}
 	}
 	common.PortSet.WriteMutex.Lock()
+	defer common.PortSet.WriteMutex.Unlock()
 	key := fmt.Sprintf("tcp-%s", ConnectionID)
 	if port, ok := common.PortSet.Cache.Load(key); ok {
 		port.(*common.UsingPort).Timestamp = time.Now()
-		common.PortSet.WriteMutex.Unlock()
 	}
 }
 

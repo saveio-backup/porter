@@ -22,7 +22,7 @@ import (
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
 
-func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
+func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 	var err error
 	var size uint32
 	// Read until all header bytes have been read.
@@ -38,7 +38,26 @@ func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
 		totalBytesRead += bytesRead
 	}
 
+	if binary.BigEndian.Uint32(sizeBuf) != common.Parameters.NetworkID {
+		return nil, errors.New("networkID is not match the message info which is contained in msg 4 bytes ahead when recv Raw Message")
+	}
+
+	sizeBuf = make([]byte, 4)
+	bytesRead, totalBytesRead = 0, 0
+
+	for totalBytesRead < 4 && err == nil {
+		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
+		if err != nil || bytesRead == 0 {
+			log.Error("tcp receive raw message head err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
+			return nil, err
+		}
+		totalBytesRead += bytesRead
+	}
+
 	size = binary.BigEndian.Uint32(sizeBuf)
+	if size == 0 {
+		return nil, errors.New("message body size is zero in head expression when recvTcpRawMsg")
+	}
 	buffer := make([]byte, size)
 
 	bytesRead, totalBytesRead = 0, 0
@@ -54,7 +73,14 @@ func receiveTcpRawMessage(state *ConnState) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	totalBytesRead += bytesRead
+
+	// Deserialize message.
+	msg := new(protobuf.Message)
+	err = proto.Unmarshal(buffer, msg)
+	if err != nil {
+		return nil, errors.New("failed to unmarshal message in receiveTcpRawMessage")
+	}
+	log.Info("in receiveTcpRawMessage recv a message will be transfered, sender from:", msg.Sender.Address, ",send to:", sendTo, ",msg.opcode:", msg.Opcode, ",networkID:", msg.NetID)
 	return append(sizeBuf, buffer...), nil
 }
 
@@ -64,17 +90,33 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	// Read until all header bytes have been read.
 	buffer := make([]byte, 4)
 	bytesRead, totalBytesRead := 0, 0
-
 	for totalBytesRead < 4 && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("tcp receive message head err:", err.Error(), "has read buffer message:", buffer, "buffer.len:", bytesRead)
+			log.Error("tcp receive message head err:", err.Error(), ",has read buffer message:", buffer, ",buffer.len:", bytesRead)
+			return nil, err
+		}
+		totalBytesRead += bytesRead
+	}
+
+	if binary.BigEndian.Uint32(buffer) != common.Parameters.NetworkID {
+		return nil, errors.New("networkID is not match the message info which is contained in msg 4 bytes ahead when recvMessage")
+	}
+
+	buffer = make([]byte, 4)
+	bytesRead, totalBytesRead = 0, 0
+	for totalBytesRead < 4 && err == nil {
+		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
+		if err != nil || bytesRead == 0 {
+			log.Error("tcp receive message head err:", err.Error(), ",has read buffer message:", buffer, ",buffer.len:", bytesRead)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
 	}
 	size = binary.BigEndian.Uint32(buffer)
-
+	if size == 0 {
+		return nil, errors.New("message body size is zero when recvTcpMsg")
+	}
 	// Read until all message bytes have been read.
 	buffer = make([]byte, size)
 
@@ -83,7 +125,7 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("tcp receive message body err:", err.Error(), "has read buffer message:", buffer[:totalBytesRead+bytesRead], "buffer.len:", bytesRead, "total message body size:", size)
+			log.Error("tcp receive message body err:", err.Error(), ",has read buffer message:", buffer[:totalBytesRead+bytesRead], ",buffer.len:", bytesRead, "total message body size:", size)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -133,8 +175,9 @@ func sendMessage(state *ConnState, message proto.Message) error {
 	}
 
 	// Serialize size.
-	buffer := make([]byte, 4)
-	binary.BigEndian.PutUint32(buffer, uint32(len(bytes)))
+	buffer := make([]byte, 8)
+	binary.BigEndian.PutUint32(buffer, common.Parameters.NetworkID)
+	binary.BigEndian.PutUint32(buffer[4:], uint32(len(bytes)))
 
 	buffer = append(buffer, bytes...)
 
@@ -168,19 +211,23 @@ func sendMessage(state *ConnState, message proto.Message) error {
 }
 
 func transferTcpRawMessage(message []byte, state *ConnState) error {
-	totalSize := len(message)
-	if totalSize == 0 {
+	if len(message) == 0 {
 		return errors.New("in transferTCPRawMessage, will send empty message")
 	}
 	// Write until all bytes have been written.
 	bytesWritten, totalBytesWritten := 0, 0
 
+	buffer := make([]byte, 4)
+	binary.BigEndian.PutUint32(buffer, common.Parameters.NetworkID)
+
+	buffer = append(buffer, message...)
+
 	state.writerMutex.Lock()
 	defer state.writerMutex.Unlock()
 
 	var err error
-	for totalBytesWritten < len(message) && err == nil {
-		bytesWritten, err = state.writer.Write(message[totalBytesWritten:])
+	for totalBytesWritten < len(buffer) && err == nil {
+		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
 		if err != nil {
 			log.Errorf("tcp stream(raw): failed to write entire buffer, err: %+v", err)
 			return err
