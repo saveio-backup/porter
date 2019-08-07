@@ -80,7 +80,7 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 	if err != nil {
 		return nil, errors.New("failed to unmarshal message in receiveTcpRawMessage")
 	}
-	log.Info("in receiveTcpRawMessage recv a message will be transfered, sender from:", msg.Sender.Address, ",send to:", sendTo, ",msg.opcode:", msg.Opcode, ",networkID:", msg.NetID)
+	log.Info("in receiveTcpRawMessage recv a message will be transfered, sender from:", msg.Sender.Address, ",send to:", sendTo, ",msg.opcode:", msg.Opcode, ",msg.Nonce:", msg.GetMessageNonce(), ",networkID:", msg.NetID)
 	return append(sizeBuf, buffer...), nil
 }
 
