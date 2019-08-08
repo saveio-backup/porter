@@ -22,7 +22,7 @@ import (
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
 
-func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
+func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, string, uint32, uint64) {
 	var err error
 	var size uint32
 	// Read until all header bytes have been read.
@@ -33,13 +33,13 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
 			log.Error("tcp receive raw message head err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
-			return nil, err
+			return nil, err, "", 0, 0
 		}
 		totalBytesRead += bytesRead
 	}
 
 	if binary.BigEndian.Uint32(sizeBuf) != common.Parameters.NetworkID {
-		return nil, errors.New("networkID is not match the message info which is contained in msg 4 bytes ahead when recv Raw Message")
+		return nil, errors.New("networkID is not match the message info which is contained in msg 4 bytes ahead when recv Raw Message"), "", 0, 0
 	}
 
 	sizeBuf = make([]byte, 4)
@@ -49,14 +49,14 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
 			log.Error("tcp receive raw message head err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
-			return nil, err
+			return nil, err, "", 0, 0
 		}
 		totalBytesRead += bytesRead
 	}
 
 	size = binary.BigEndian.Uint32(sizeBuf)
 	if size == 0 {
-		return nil, errors.New("message body size is zero in head expression when recvTcpRawMsg")
+		return nil, errors.New("message body size is zero in head expression when recvTcpRawMsg"), "", 0, 0
 	}
 	buffer := make([]byte, size)
 
@@ -66,22 +66,22 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
 			log.Error("tcp receive raw message body err:", err.Error(), "has read buffer message:", buffer[:totalBytesRead+bytesRead], "buffer.len:", bytesRead, "total message body size:", size)
-			return nil, err
+			return nil, err, "", 0, 0
 		}
 		totalBytesRead += bytesRead
 	}
 	if err != nil {
-		return nil, err
+		return nil, err, "", 0, 0
 	}
 
 	// Deserialize message.
 	msg := new(protobuf.Message)
 	err = proto.Unmarshal(buffer, msg)
 	if err != nil {
-		return nil, errors.New("failed to unmarshal message in receiveTcpRawMessage")
+		return nil, errors.New("failed to unmarshal message in receiveTcpRawMessage"), "", 0, 0
 	}
 	log.Info("in receiveTcpRawMessage recv a message will be transfered, sender from:", msg.Sender.Address, ",send to:", sendTo, ",msg.opcode:", msg.Opcode, ",msg.Nonce:", msg.GetMessageNonce(), ",networkID:", msg.NetID)
-	return append(sizeBuf, buffer...), nil
+	return append(sizeBuf, buffer...), nil, msg.Sender.Address, msg.Opcode, msg.GetMessageNonce()
 }
 
 func receiveMessage(state *ConnState) (*protobuf.Message, error) {
