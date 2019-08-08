@@ -49,7 +49,7 @@ func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnSt
 		log.Error("proxy listen server start ERROR:", err.Error())
 		return ""
 	} else {
-		log.Infof("start proxyListen for inbound proxy apply(remote-ip:%s), proxy-ip/port:%d", state.conn.RemoteAddr(), listener.Addr().String())
+		log.Infof("start proxyListen for inbound proxy apply(remote-ip:%s), proxy-ip/port:%s", state.conn.RemoteAddr(), listener.Addr().String())
 	}
 
 	peerInfo := peer{addr: fmt.Sprintf("%s:%d", common.GetPublicIP(), port),

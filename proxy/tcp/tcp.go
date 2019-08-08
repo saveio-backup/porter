@@ -180,7 +180,7 @@ func (p *TCPProxyServer) monitorPeerStatus() {
 				if time.Now().After(value.(*common.UsingPort).Timestamp.Add(timeout * time.Second)) {
 					delKey := fmt.Sprintf("%s-%s", value.(*common.UsingPort).Protocol, value.(*common.UsingPort).ConnectionID)
 					common.PortSet.Cache.Delete(delKey)
-					log.Infof("proxy port timeout in memory cache:", delKey, " delete now. latest timestamp:", value.(*common.UsingPort).Timestamp)
+					log.Info("proxy port timeout in memory cache:", delKey, " delete now. latest timestamp:", value.(*common.UsingPort).Timestamp)
 				}
 				return true
 			})
