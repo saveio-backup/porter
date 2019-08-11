@@ -21,21 +21,21 @@ func (p *TCPProxyServer) startListenScheduler() {
 		select {
 		case item := <-p.listenerBuffer:
 			var proxyIP string
-			if value, ok := p.proxies.Load(item.connectionID); !ok {
-				proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
-				if "" == proxyIP {
-					log.Error("in startListenScheduler, listen and accept get nil proxyIP value")
-					continue
-				}
-				if err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP}); err != nil {
-					log.Error("tcp proxy handle listen scheduler err:", err.Error())
-				}
-			} else {
-				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist.", item.connectionID, value.(peer).addr))
-				if err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: value.(peer).addr}); err != nil {
-					log.Error("tcp proxy handle listen scheduler when re-sent, err:", err.Error())
-				}
+
+			if value, ok := p.proxies.Load(item.connectionID); ok {
+				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist, delete relevant resource immediately.", item.connectionID, value.(peer).addr))
+				p.releasePeerResource(item.connectionID)
 			}
+
+			proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
+			if "" == proxyIP {
+				log.Error("in startListenScheduler, listen and accept get nil proxyIP value")
+				continue
+			}
+			if err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP}); err != nil {
+				log.Error("tcp proxy handle listen scheduler err:", err.Error())
+			}
+
 		case <-p.stop:
 			return
 		}

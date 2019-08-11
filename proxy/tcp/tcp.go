@@ -137,12 +137,12 @@ func (p *TCPProxyServer) serverAccept() error {
 				message, err := receiveMessage(connState)
 				if nil == message || err != nil {
 					log.Warn("tcp receive message goroutine err:", err.Error(), "listen remote addr:", conn.RemoteAddr().String())
-					if firstInboundMsg == true {
+					if firstInboundMsg == true || connState.connectionID == "" {
 						log.Error("first inbound message is error, connection will be closed immediately.")
 						conn.Close()
-					} else {
-						p.releasePeerResource(connState.connectionID)
+						break
 					}
+					p.releasePeerResource(connState.connectionID)
 					break
 				}
 				log.Info("receive a new message which need to be controll message type in main Accept, message.opcode:",

@@ -100,7 +100,8 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	}
 
 	if binary.BigEndian.Uint32(buffer) != common.Parameters.NetworkID {
-		return nil, errors.New("networkID is not match the message info which is contained in msg 4 bytes ahead when recvMessage")
+		return nil, errors.Errorf("networkID is not match the message info which is contained in msg 4 bytes ahead when recvMessage, "+
+			"recv.NetID:%d, setting.NetID:%d", binary.BigEndian.Uint32(buffer), common.Parameters.NetworkID)
 	}
 
 	buffer = make([]byte, 4)
@@ -125,7 +126,8 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	for totalBytesRead < int(size) && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("tcp receive message body err:", err.Error(), ",has read buffer message:", buffer[:totalBytesRead+bytesRead], ",buffer.len:", bytesRead, "total message body size:", size)
+			log.Error("tcp receive message body err:", err.Error(), ",has read buffer message:",
+				buffer[:totalBytesRead+bytesRead], ",buffer.len:", bytesRead, "total message body size:", size)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
