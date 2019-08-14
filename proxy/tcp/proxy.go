@@ -23,8 +23,8 @@ func (p *TCPProxyServer) startListenScheduler() {
 			var proxyIP string
 
 			if value, ok := p.proxies.Load(item.connectionID); ok {
-				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist, delete relevant resource immediately.", item.connectionID, value.(peer).addr))
-				p.releasePeerResource(item.connectionID)
+				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist, don't delete relevant resource immediately but cover old value.", item.connectionID, value.(peer).addr))
+				//p.releasePeerResource(item.connectionID)
 			}
 
 			proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)

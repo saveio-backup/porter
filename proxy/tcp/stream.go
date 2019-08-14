@@ -93,7 +93,7 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	for totalBytesRead < 4 && err == nil {
 		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("tcp receive message head err:", err.Error(), ",has read buffer message:", buffer, ",buffer.len:", bytesRead)
+			log.Error("tcp receive networkID message head err:", err.Error(), ",has read buffer message:", buffer, ",buffer.len:", bytesRead)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
