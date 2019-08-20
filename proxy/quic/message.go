@@ -51,12 +51,13 @@ func flushLoop(state *ConnState) {
 func (p *QuicProxyServer) releasePeerResource(ConnectionID string) {
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
 		peerInfo.(peer).release.Do(func() {
-			log.Info("release peer resource, connectionID:", ConnectionID)
+			log.Info("release peer resource, proxy-ip:", peerInfo.(peer).addr)
 			close(peerInfo.(peer).stop)
 			close(peerInfo.(peer).state.stop)
 			peerInfo.(peer).listener.Close()
 			peerInfo.(peer).conn.Close()
 			peerInfo.(peer).state.conn.Close()
+			peerInfo.(peer).state.session.Close()
 			p.proxies.Delete(ConnectionID)
 		})
 	}
@@ -68,7 +69,7 @@ func (p *QuicProxyServer) handleProxyRequestMessage(message *protobuf.Message, s
 	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
 	state.connectionID = ConnectionID
 	p.listenerBuffer <- peerListen{connectionID: ConnectionID, state: state}
-	go flushLoop(state)
+	//go flushLoop(state)
 }
 
 func (p *QuicProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, state *ConnState) {
@@ -99,11 +100,6 @@ func (p *QuicProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message,
 	common.PortSet.WriteMutex.Unlock()
 }
 
-func (p *QuicProxyServer) handleDisconnectMessage(message *protobuf.Message) {
-	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
-	p.releasePeerResource(ConnectionID)
-}
-
 func (p *QuicProxyServer) handleControlMessage() {
 	for {
 		select {
@@ -113,8 +109,6 @@ func (p *QuicProxyServer) handleControlMessage() {
 				p.handleProxyRequestMessage(item.message, item.state)
 			case uint32(opcode.KeepaliveCode):
 				p.handleProxyKeepaliveMessage(item.message, item.state)
-			case uint32(opcode.DisconnectCode):
-				p.handleDisconnectMessage(item.message)
 			default:
 				//log.Warn("please send correct control message type, include ProxyRequest/Keepalive/Disconnect, message.opcode:", item.message.Opcode, "send to ip:",item.message.Sender.Address)
 			}

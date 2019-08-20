@@ -22,7 +22,7 @@ import (
 
 const defaultRecvBufferSize = 4 * 1024 * 1024
 
-func receiveQuicRawMessage(state *ConnState) ([]byte, error) {
+func receiveQuicRawMessage(state *ConnState, sendTo string) ([]byte, error, string, uint32, uint64) {
 	var err error
 	var size uint32
 	// Read until all header bytes have been read.
@@ -32,15 +32,34 @@ func receiveQuicRawMessage(state *ConnState) ([]byte, error) {
 	for totalBytesRead < 4 && err == nil {
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
-			log.Error("quic receive message head err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
-			return nil, err
+			log.Error("quic receive raw NetworkID message err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
+			return nil, err, "", 0, 0
 		}
 		totalBytesRead += bytesRead
 	}
-	if err != nil {
-		return nil, err
+	if binary.BigEndian.Uint32(sizeBuf) != common.Parameters.NetworkID {
+		return nil, errors.Errorf("networkID is not match the quic message info which is contained in msg "+
+			"4 bytes ahead when recv Raw Message, recv.NetworkID:%d, expect.NetworkID:%d",
+			binary.BigEndian.Uint32(sizeBuf), common.Parameters.NetworkID), "", 0, 0
 	}
+
+	sizeBuf = make([]byte, 4)
+	bytesRead, totalBytesRead = 0, 0
+
+	for totalBytesRead < 4 && err == nil {
+		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
+		if err != nil || bytesRead == 0 {
+			log.Error("quic receive message head err:", err.Error(), "has read buffer message:",
+				sizeBuf[:totalBytesRead], "once read buffer.len:", bytesRead)
+			return nil, err, "", 0, 0
+		}
+		totalBytesRead += bytesRead
+	}
+
 	size = binary.BigEndian.Uint32(sizeBuf)
+	if size == 0 {
+		return nil, errors.New("message body size is zero in head expression when recvQuicRawMsg"), "", 0, 0
+	}
 	buffer := make([]byte, size)
 
 	bytesRead, totalBytesRead = 0, 0
@@ -50,12 +69,18 @@ func receiveQuicRawMessage(state *ConnState) ([]byte, error) {
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
 			log.Error("quic receive message head err:", err.Error(), "has read buffer message:", buffer[:totalBytesRead+bytesRead], "buffer.len:", bytesRead, "total message body size:", size)
-			return nil, err
+			return nil, err, "", 0, 0
 		}
 		totalBytesRead += bytesRead
 	}
-	totalBytesRead += bytesRead
-	return append(sizeBuf, buffer...), nil
+	// Deserialize message.
+	msg := new(protobuf.Message)
+	err = proto.Unmarshal(buffer, msg)
+	if err != nil {
+		return nil, errors.New("failed to unmarshal message in receiveQuicRawMessage"), "", 0, 0
+	}
+	log.Info("in receiveQuicRawMessage recv a message will be transfered, sender from:", msg.Sender.Address, ",send to:", sendTo, ",msg.opcode:", msg.Opcode, ",msg.Nonce:", msg.GetMessageNonce(), ",networkID:", msg.NetID)
+	return append(sizeBuf, buffer...), nil, msg.Sender.Address, msg.Opcode, msg.GetMessageNonce()
 }
 
 func receiveMessage(state *ConnState) (*protobuf.Message, error) {
@@ -64,7 +89,21 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 	// Read until all header bytes have been read.
 	buffer := make([]byte, 4)
 	bytesRead, totalBytesRead := 0, 0
+	for totalBytesRead < 4 && err == nil {
+		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
+		if err != nil || bytesRead == 0 {
+			log.Error("quic receive raw NetworkID message err:", err.Error(), "has read buffer message:", buffer, "buffer.len:", bytesRead)
+			return nil, err
+		}
+		totalBytesRead += bytesRead
+	}
+	if binary.BigEndian.Uint32(buffer) != common.Parameters.NetworkID {
+		return nil, errors.Errorf("networkID is not match the quic message info which is contained in msg 4 bytes ahead when recv Raw Message,"+
+			" recv.NetID:%d, setting.NetID:%d", binary.BigEndian.Uint32(buffer), common.Parameters.NetworkID)
+	}
 
+	buffer = make([]byte, 4)
+	bytesRead, totalBytesRead = 0, 0
 	for totalBytesRead < 4 && err == nil {
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
@@ -74,6 +113,9 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 		totalBytesRead += bytesRead
 	}
 	size = binary.BigEndian.Uint32(buffer)
+	if size == 0 {
+		return nil, errors.New("message body size is zero when recvQuicMsg")
+	}
 
 	// Read until all message bytes have been read.
 	buffer = make([]byte, size)
@@ -125,31 +167,24 @@ func prepareMessage(message proto.Message, state *ConnState) *protobuf.Message {
 func sendMessage(state *ConnState, message proto.Message) error {
 	bytes, err := proto.Marshal(prepareMessage(message, state))
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal message")
+		return errors.Wrap(err, "failed to marshal message in QUIC sendMessage")
 	}
 	if len(bytes) == 0 {
 		log.Error("(quic)stack info:", fmt.Sprintf("%s", debug.Stack()))
 		return errors.New("quic sendMessage,len(message) is empty")
 	}
 	// Serialize size.
-	buffer := make([]byte, 4)
-	binary.BigEndian.PutUint32(buffer, uint32(len(bytes)))
+	buffer := make([]byte, 8)
+	binary.BigEndian.PutUint32(buffer, common.Parameters.NetworkID)
+	binary.BigEndian.PutUint32(buffer[4:], uint32(len(bytes)))
 
 	buffer = append(buffer, bytes...)
-	totalSize := len(buffer)
 
 	// Write until all bytes have been written.
 	bytesWritten, totalBytesWritten := 0, 0
 
 	state.writerMutex.Lock()
 	defer state.writerMutex.Unlock()
-
-	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
-		if err := state.writer.Flush(); err != nil {
-			log.Errorf("quic stream(common): flush err in sendMessage, err: %+v", err)
-			return err
-		}
-	}
 
 	for totalBytesWritten < len(buffer) && err == nil {
 		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
@@ -164,29 +199,31 @@ func sendMessage(state *ConnState, message proto.Message) error {
 		return errors.Wrap(err, "quic stream: failed to write to socket")
 	}
 
+	if err := state.writer.Flush(); err != nil {
+		log.Errorf("tcp stream(common): failed to flush buffer, err: %+v", err)
+		return err
+	}
+
 	return nil
 }
 
 func transferQuicRawMessage(message []byte, state *ConnState) error {
-	totalSize := len(message)
-	if totalSize == 0 {
+	if len(message) == 0 {
 		return errors.New("in transferQuicRawMessage, will send empty message")
 	}
 	// Write until all bytes have been written.
 	bytesWritten, totalBytesWritten := 0, 0
 
+	buffer := make([]byte, 4)
+	binary.BigEndian.PutUint32(buffer, common.Parameters.NetworkID)
+	buffer = append(buffer, message...)
+
 	state.writerMutex.Lock()
 	defer state.writerMutex.Unlock()
 
-	if (state.writer.Buffered() > 0) && (state.writer.Available() < totalSize) {
-		if err := state.writer.Flush(); err != nil {
-			log.Errorf("quic stream(raw): transfer quic raw message err: %+v", err)
-			return err
-		}
-	}
 	var err error
-	for totalBytesWritten < len(message) && err == nil {
-		bytesWritten, err = state.writer.Write(message[totalBytesWritten:])
+	for totalBytesWritten < len(buffer) && err == nil {
+		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
 		if err != nil {
 			log.Errorf("quic stream(raw): failed to write entire buffer, err: %+v", err)
 			return err
@@ -196,6 +233,11 @@ func transferQuicRawMessage(message []byte, state *ConnState) error {
 
 	if err != nil {
 		return errors.Wrap(err, "quic stream: failed to write to socket")
+	}
+
+	if err := state.writer.Flush(); err != nil {
+		log.Errorf("tcp stream(raw): failed to flush entire buffer, err: %+v", err)
+		return err
 	}
 
 	return nil

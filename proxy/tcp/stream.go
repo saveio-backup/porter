@@ -70,9 +70,6 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, strin
 		}
 		totalBytesRead += bytesRead
 	}
-	if err != nil {
-		return nil, err, "", 0, 0
-	}
 
 	// Deserialize message.
 	msg := new(protobuf.Message)
@@ -169,7 +166,7 @@ func prepareMessage(message proto.Message, state *ConnState) *protobuf.Message {
 func sendMessage(state *ConnState, message proto.Message) error {
 	bytes, err := proto.Marshal(prepareMessage(message, state))
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal message")
+		return errors.Wrap(err, "failed to marshal message in TCP sendMessage")
 	}
 	if len(bytes) == 0 {
 		log.Error("stack info:", fmt.Sprintf("%s", debug.Stack()))
@@ -188,8 +185,6 @@ func sendMessage(state *ConnState, message proto.Message) error {
 
 	state.writerMutex.Lock()
 	defer state.writerMutex.Unlock()
-
-	//bw, isBuffered := w.(*bufio.Writer)
 
 	for totalBytesWritten < len(buffer) && err == nil {
 		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
@@ -221,7 +216,6 @@ func transferTcpRawMessage(message []byte, state *ConnState) error {
 
 	buffer := make([]byte, 4)
 	binary.BigEndian.PutUint32(buffer, common.Parameters.NetworkID)
-
 	buffer = append(buffer, message...)
 
 	state.writerMutex.Lock()

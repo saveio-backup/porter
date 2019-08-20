@@ -13,6 +13,10 @@ import (
 	"sync"
 	"time"
 
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
@@ -188,8 +192,24 @@ func (p *TCPProxyServer) monitorPeerStatus() {
 	}
 }
 
+func (p *TCPProxyServer) waitExit() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	select {
+	case sig := <-sigs:
+		log.Infof("TCPProxyServer received exit signal:%v,", sig.String(), ",begin to release all resource.")
+		p.proxies.Range(func(key, value interface{}) bool {
+			p.releasePeerResource(key.(string))
+			return true
+		})
+		p.mainListener.Close()
+		os.Exit(0)
+	}
+}
+
 func (p *TCPProxyServer) StartTCPServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.tcpServerListenAndAccept(common.GetLocalIP(), port)
+	go p.waitExit()
 	<-make(chan struct{})
 }

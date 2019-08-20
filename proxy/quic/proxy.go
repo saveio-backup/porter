@@ -23,17 +23,20 @@ func (p *QuicProxyServer) startListenScheduler() {
 		select {
 		case item := <-p.listenerBuffer:
 			var proxyIP string
-			if value, ok := p.proxies.Load(item.connectionID); !ok {
-				proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
-				err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
-				if err != nil {
-					log.Error("quic listen scheduler err:", err.Error())
-				}
-			} else {
-				log.Info(fmt.Sprintf("(quic) origin (%s) relay ip is: %s, has exist.", item.connectionID, value.(peer).addr))
-				if err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: value.(peer).addr}); err != nil {
-					log.Error("quic proxy handle listen scheduler when re-sent, err:", err.Error())
-				}
+			if value, ok := p.proxies.Load(item.connectionID); ok {
+				log.Info(fmt.Sprintf("(quic) origin (%s) relay ip is: %s, has exist, don't delete relevant resource immediately but cover old value except for listener conn.", item.connectionID, value.(peer).addr))
+				value.(peer).listener.Close()
+				close(value.(peer).stop)
+			}
+			proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
+			if "" == proxyIP {
+				log.Error("in QUIC startListenScheduler, listen and accept get nil proxyIP value")
+				continue
+			}
+
+			err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP})
+			if err != nil {
+				log.Error("quic listen scheduler err:", err.Error(), ",proxy ip:", proxyIP)
 			}
 		case <-p.stop:
 			return
@@ -45,10 +48,10 @@ func (p *QuicProxyServer) proxyListenAndAccept(connectionID string, state *ConnS
 	port := common.RandomPort("quic", connectionID)
 	listener, err := listen(common.GetLocalIP(), port)
 	if err != nil {
-		log.Error("proxy listen server start ERROR:", err.Error())
+		log.Error("proxy listen server start ERROR:", err.Error(), ",random port:", port)
 		return ""
 	} else {
-		log.Info("listen to server", listener.Addr().String())
+		log.Infof("start proxyListen for inbound proxy apply(remote-ip:%s), proxy-ip/port:%s", state.remoteAddr, listener.Addr().String())
 	}
 
 	peerInfo := peer{addr: fmt.Sprintf("%s:%d", common.GetPublicIP(), port),
@@ -77,23 +80,35 @@ func (p *QuicProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 		defer stream.Close()
 		defer conn.Close()
 		//defer p.releasePeerResource(connectionID) //不要releasePeerResource， 只释放掉出问题的连接即可，不要释放无关连接；
-		connState := newConnState(stream, "")
+		connState := newConnState(stream, "", conn)
 		close(connState.stop) //connState.stop没有使用，可以立刻关闭;
 		for {
 			select {
+			case <-peerInfo.stop:
+				log.Info("quic goroutine exit receive stop signal: peerInfo.stop, listen ip is: ", peerInfo.addr)
+				return
 			case <-peerInfo.state.stop:
-				log.Info("(quic) goroutine exit, listen ip is ", peerInfo.listener.Addr().String())
+				log.Info("quic goroutine exit receive stop signal: peerInfo.state.stop, listen ip is: ", peerInfo.addr)
 				return
 			default:
-				buffer, err := receiveQuicRawMessage(connState)
+				buffer, err, sendFrom, opcode, nonce := receiveQuicRawMessage(connState, peerInfo.addr)
 				if 0 == len(buffer) || nil == buffer {
-					log.Error("(quic) onceAccept groutine, receive empty message")
+					log.Error("(quic) onceAccept groutine, receive empty message. proxy listen server/ip:", peerInfo.addr,
+						"remote client addr:", conn.RemoteAddr().String())
+					return
+				}
+				if err != nil {
+					log.Error("(quic) onceAccept goroutine receiveTcpRawMsg err:", err.Error(), "proxy listen server/ip:",
+						peerInfo.addr, "remote client addr:", conn.RemoteAddr().String())
 					return
 				}
 				err = transferQuicRawMessage(buffer, peerInfo.state)
 				if err != nil {
-					log.Error("(quic) transfer quic raw message err:", err.Error(), "addr:", peerInfo.listener.Addr().String())
+					log.Error("transfer quic raw message err:", err.Error(), "proxy listen server/ip addr:", peerInfo.addr,
+						"remote client addr:", conn.RemoteAddr().String())
 					return
+				} else {
+					log.Info("transfer quic raw message success, sender from:", sendFrom, ",send to:", peerInfo.addr, ",msg.opcode:", opcode, ",msg.Nonce:", nonce)
 				}
 			}
 		}
@@ -109,6 +124,8 @@ func (p *QuicProxyServer) proxyAccept(peerInfo peer, connectionID string) error 
 			return nil
 		default:
 			if err := p.onceAccept(peerInfo, connectionID); err != nil {
+				log.Error("proxyAccept run err when gothrough onceAccept, err:", err.Error(), ",proxy-addr:", peerInfo.addr)
+				//p.releasePeerResource(connectionID)
 				return err
 			}
 		}

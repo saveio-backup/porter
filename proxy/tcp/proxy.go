@@ -23,17 +23,18 @@ func (p *TCPProxyServer) startListenScheduler() {
 			var proxyIP string
 
 			if value, ok := p.proxies.Load(item.connectionID); ok {
-				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist, don't delete relevant resource immediately but cover old value.", item.connectionID, value.(peer).addr))
-				//p.releasePeerResource(item.connectionID)
+				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist, don't delete relevant resource immediately but cover old value except for listen conn.", item.connectionID, value.(peer).addr))
+				value.(peer).listener.Close()
+				close(value.(peer).stop)
 			}
 
 			proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
 			if "" == proxyIP {
-				log.Error("in startListenScheduler, listen and accept get nil proxyIP value")
+				log.Error("in TCP startListenScheduler, listen and accept get nil proxyIP value")
 				continue
 			}
 			if err := sendMessage(item.state, &protobuf.ProxyResponse{ProxyAddress: proxyIP}); err != nil {
-				log.Error("tcp proxy handle listen scheduler err:", err.Error())
+				log.Error("tcp proxy handle listen scheduler err:", err.Error(), ",proxy ip:", proxyIP)
 			}
 
 		case <-p.stop:
@@ -46,7 +47,7 @@ func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnSt
 	port := common.RandomPort("tcp", connectionID)
 	listener, err := listen(common.GetLocalIP(), port)
 	if err != nil {
-		log.Error("proxy listen server start ERROR:", err.Error())
+		log.Error("proxy listen server start ERROR:", err.Error(), "random port:", port)
 		return ""
 	} else {
 		log.Infof("start proxyListen for inbound proxy apply(remote-ip:%s), proxy-ip/port:%s", state.conn.RemoteAddr(), listener.Addr().String())
@@ -82,8 +83,11 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 		close(connState.stop) //connState.stop没有使用，可以立刻关闭;
 		for {
 			select {
+			case <-peerInfo.stop:
+				log.Info("tcp goroutine exit receive stop signal: peerInfo.stop, listen ip is: ", peerInfo.addr)
+				return
 			case <-peerInfo.state.stop:
-				log.Info("goroutine exit, listen ip is: ", peerInfo.addr)
+				log.Info("tcp goroutine exit receive stop signal: peerInfo.state.stop, listen ip is: ", peerInfo.addr)
 				return
 			default:
 				buffer, err, sendFrom, opcode, nonce := receiveTcpRawMessage(connState, peerInfo.addr)
@@ -119,8 +123,8 @@ func (p *TCPProxyServer) proxyAccept(peerInfo peer, connectionID string) error {
 			return nil
 		default:
 			if err := p.onceAccept(peerInfo, connectionID); err != nil {
-				log.Error("proxyAccept run err when gothrough onceAccept, err:", err.Error())
-				p.releasePeerResource(connectionID)
+				log.Error("proxyAccept run err when gothrough onceAccept, err:", err.Error(), ",proxy-addr:", peerInfo.addr)
+				//p.releasePeerResource(connectionID)
 				return err
 			}
 		}

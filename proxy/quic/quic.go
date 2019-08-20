@@ -19,6 +19,10 @@ import (
 	"sync"
 	"time"
 
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/lucas-clemente/quic-go"
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
@@ -70,6 +74,7 @@ type QuicProxyServer struct {
 }
 
 type ConnState struct {
+	session      quic.Session
 	conn         quic.Stream
 	writer       *bufio.Writer
 	messageNonce uint64
@@ -92,8 +97,9 @@ func Init() *QuicProxyServer {
 	}
 }
 
-func newConnState(listenr quic.Stream, addr string) *ConnState {
+func newConnState(listenr quic.Stream, addr string, session quic.Session) *ConnState {
 	return &ConnState{
+		session:      session,
 		conn:         listenr,
 		writer:       bufio.NewWriterSize(listenr, defaultRecvBufferSize),
 		messageNonce: 0,
@@ -165,16 +171,25 @@ func (p *QuicProxyServer) serverAccept() error {
 			continue
 		}
 		go func(stream quic.Stream, conn quic.Session) {
-			connState := newConnState(stream, conn.RemoteAddr().String())
+			connState := newConnState(stream, conn.RemoteAddr().String(), conn)
+			firstInboundMsg := true
 			for {
 				message, err := receiveMessage(connState)
 				if nil == message || err != nil {
-					log.Error("quic receive message goroutine err:", err.Error(), "listen remote addr:", conn.RemoteAddr().String())
+					log.Warn("quic receive message goroutine err:", err.Error(), "listen remote addr:", conn.RemoteAddr().String())
+					if firstInboundMsg == true || connState.connectionID == "" {
+						log.Error("first inbound quic message is error, connection will be closed immediately.")
+						conn.Close()
+						break
+					}
 					p.releasePeerResource(connState.connectionID)
 					break
 				}
+				log.Info("receive a new quic message which need to be controll message type in main Accept, message.opcode:",
+					message.Opcode, "netID:", message.NetID, "sender address:", message.Sender.Address)
 				if message.Opcode == uint32(opcode.ProxyRequestCode) || message.Opcode == uint32(opcode.KeepaliveCode) {
 					p.msgBuffer <- msgNotify{message: message, state: connState}
+					firstInboundMsg = false
 				}
 			}
 		}(stream, conn)
@@ -191,7 +206,8 @@ func (p *QuicProxyServer) monitorPeerStatus() {
 			p.proxies.Range(func(key, value interface{}) bool {
 				if time.Now().After(value.(peer).updateTime.Add(PEER_MONITOR_TIMEOUT)) {
 					p.releasePeerResource(key.(string))
-					log.Info("(quic) client has disconnect from proxy server, peerID:", key.(string))
+					log.Info("client has disconnect from proxy server as for monitor timeout, proxy-addr:", value.(peer).addr,
+						",monitor timeout second:", PEER_MONITOR_TIMEOUT, ",lastst update time:", value.(peer).updateTime)
 				}
 				return true
 			})
@@ -202,7 +218,9 @@ func (p *QuicProxyServer) monitorPeerStatus() {
 			}
 			common.PortSet.Cache.Range(func(key, value interface{}) bool {
 				if time.Now().After(value.(*common.UsingPort).Timestamp.Add(timeout * time.Second)) {
-					common.PortSet.Cache.Delete(fmt.Sprintf("%s-%s", value.(*common.UsingPort).Protocol, value.(*common.UsingPort).ConnectionID))
+					delKey := fmt.Sprintf("%s-%s", value.(*common.UsingPort).Protocol, value.(*common.UsingPort).ConnectionID)
+					common.PortSet.Cache.Delete(delKey)
+					log.Info("proxy port timeout in memory cache:", delKey, " delete now. latest timestamp:", value.(*common.UsingPort).Timestamp)
 				}
 				return true
 			})
@@ -210,8 +228,24 @@ func (p *QuicProxyServer) monitorPeerStatus() {
 	}
 }
 
+func (p *QuicProxyServer) waitExit() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	select {
+	case sig := <-sigs:
+		log.Infof("QuicProxyServer received exit signal:%v,", sig.String(), ",begin to release all resource.")
+		p.proxies.Range(func(key, value interface{}) bool {
+			p.releasePeerResource(key.(string))
+			return true
+		})
+		p.mainListener.Close()
+		os.Exit(0)
+	}
+}
+
 func (p *QuicProxyServer) StartQuicServer(port uint16) {
 	go p.monitorPeerStatus()
 	go p.quicServerListenAndAccept(common.GetLocalIP(), port)
+	go p.waitExit()
 	<-make(chan struct{})
 }
