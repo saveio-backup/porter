@@ -20,7 +20,7 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
-const defaultRecvBufferSize = 4 * 1024 * 1024
+const defaultRecvBufferSize = 512 * 1024
 
 func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, string, uint32, uint64) {
 	var err error
@@ -193,6 +193,12 @@ func sendMessage(state *ConnState, message proto.Message) error {
 			return err
 		}
 		totalBytesWritten += bytesWritten
+		if state.writer.Available() <= 0 {
+			if err = state.writer.Flush(); err != nil {
+				log.Errorf("tcp stream flush buffer immediately err:", err.Error())
+				return err
+			}
+		}
 	}
 
 	if err != nil {

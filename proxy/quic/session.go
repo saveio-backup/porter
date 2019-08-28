@@ -20,7 +20,7 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
-const defaultRecvBufferSize = 4 * 1024 * 1024
+const defaultRecvBufferSize = 512 * 1024
 
 func receiveQuicRawMessage(state *ConnState, sendTo string) ([]byte, error, string, uint32, uint64) {
 	var err error
@@ -229,6 +229,12 @@ func transferQuicRawMessage(message []byte, state *ConnState) error {
 			return err
 		}
 		totalBytesWritten += bytesWritten
+		if state.writer.Available() <= 0 {
+			if err = state.writer.Flush(); err != nil {
+				log.Errorf("quic stream flush immediately err:%s", err.Error())
+				return err
+			}
+		}
 	}
 
 	if err != nil {
