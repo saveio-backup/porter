@@ -20,7 +20,7 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
-const defaultRecvBufferSize = 512 * 1024
+const defaultRecvBufferSize = 1024 * 1024 * 4
 
 func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, string, uint32, uint64) {
 	var err error
