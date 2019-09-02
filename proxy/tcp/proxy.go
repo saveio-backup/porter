@@ -25,7 +25,7 @@ func (p *TCPProxyServer) startListenScheduler() {
 			if value, ok := p.proxies.Load(item.connectionID); ok {
 				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist, don't delete relevant resource immediately but cover old value except for listen conn.", item.connectionID, value.(peer).addr))
 				value.(peer).listener.Close()
-				close(value.(peer).stop)
+				//close(value.(peer).stop)
 			}
 
 			proxyIP = p.proxyListenAndAccept(item.connectionID, item.state)
@@ -66,6 +66,23 @@ func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnSt
 
 	go p.proxyAccept(peerInfo, connectionID)
 	return fmt.Sprintf("%s:%d", common.GetPublicIP(), port)
+}
+
+func (p *TCPProxyServer) proxyAccept(peerInfo peer, connectionID string) error {
+	for {
+		select {
+		case <-peerInfo.stop:
+			log.Info("peerInfo receive stop signal, exit now.")
+			return nil
+		default:
+			if err := p.onceAccept(peerInfo, connectionID); err != nil {
+				log.Error("proxyAccept run err when gothrough onceAccept, err:", err.Error(), ",proxy-addr:", peerInfo.addr)
+				//p.releasePeerResource(connectionID)
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
@@ -112,22 +129,5 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 			}
 		}
 	}(conn)
-	return nil
-}
-
-func (p *TCPProxyServer) proxyAccept(peerInfo peer, connectionID string) error {
-	for {
-		select {
-		case <-peerInfo.stop:
-			log.Info("peerInfo receive stop signal, exit now.")
-			return nil
-		default:
-			if err := p.onceAccept(peerInfo, connectionID); err != nil {
-				log.Error("proxyAccept run err when gothrough onceAccept, err:", err.Error(), ",proxy-addr:", peerInfo.addr)
-				//p.releasePeerResource(connectionID)
-				return err
-			}
-		}
-	}
 	return nil
 }

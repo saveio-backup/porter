@@ -51,13 +51,13 @@ func flushLoop(state *ConnState) {
 func (p *TCPProxyServer) releasePeerResource(ConnectionID string) {
 	if peerInfo, ok := p.proxies.Load(ConnectionID); ok {
 		peerInfo.(peer).release.Do(func() {
-			log.Info("release peer resource, proxy-ip:", peerInfo.(peer).addr)
+			log.Info("release peer resource, proxy-ip:", peerInfo.(peer).addr, "connection.id:", ConnectionID)
+			p.proxies.Delete(ConnectionID)
 			close(peerInfo.(peer).stop)
 			close(peerInfo.(peer).state.stop)
 			peerInfo.(peer).conn.Close()
 			peerInfo.(peer).listener.Close()
 			peerInfo.(peer).state.conn.Close()
-			p.proxies.Delete(ConnectionID)
 		})
 	}
 }
