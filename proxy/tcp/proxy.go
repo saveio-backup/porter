@@ -124,7 +124,8 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 						"remote client addr:", conn.RemoteAddr().String())
 					return
 				} else {
-					log.Info("transfer tcp raw message success, sender from:", sendFrom, ",send to:", peerInfo.addr, ",msg.opcode:", opcode, ",msg.Nonce:", nonce)
+					log.Info("transfer tcp raw message success, sender from:", sendFrom, ",send to:", peerInfo.addr,
+						",msg.opcode:", opcode, ",msg.Nonce:", nonce, "msg.len:", len(buffer))
 				}
 			}
 		}

@@ -108,7 +108,8 @@ func (p *QuicProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 						"remote client addr:", conn.RemoteAddr().String())
 					return
 				} else {
-					log.Info("transfer quic raw message success, sender from:", sendFrom, ",send to:", peerInfo.addr, ",msg.opcode:", opcode, ",msg.Nonce:", nonce)
+					log.Info("transfer quic raw message success, sender from:", sendFrom, ",send to:", peerInfo.addr,
+						",msg.opcode:", opcode, ",msg.Nonce:", nonce, "msg.len:", len(buffer))
 				}
 			}
 		}

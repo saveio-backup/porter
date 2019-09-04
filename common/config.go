@@ -20,6 +20,12 @@ const (
 
 var Version string
 
+type Compression struct {
+	Enable       bool     `json:"Enable"`
+	CompressAlgo AlgoType `json:"CompressAlgo"`
+	FileSize     int      `json:"FileSize"`
+}
+
 type Configuration struct {
 	InterfaceName   string        `json:"InterfaceName"`
 	InnerIP         string        `json:"InnerIP"`
@@ -35,6 +41,7 @@ type Configuration struct {
 	LogDir          string        `json:"LogDir"`
 	LogLevel        int           `json:"LogLevel"`
 	PorterDBPath    string        `json:"PorterDBPath"`
+	Compression     Compression   `json:"Compression"`
 }
 
 type ConfigFile struct {

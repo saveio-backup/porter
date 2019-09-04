@@ -13,6 +13,7 @@
     "NetworkID":1564141146,
     "LogDir":"./",
     "LogLevel":1,
-    "PorterDBPath":"./porterdb"
+    "PorterDBPath":"./porterdb",
+    "Compression":{"Enable":true,"CompressAlgo":1,"FileSize":4194304}
   }
 }

@@ -43,6 +43,21 @@ func receiveQuicRawMessage(state *ConnState, sendTo string) ([]byte, error, stri
 			binary.BigEndian.Uint32(sizeBuf), common.Parameters.NetworkID), "", 0, 0
 	}
 
+	algoBuf := make([]byte, 2)
+	bytesRead, totalBytesRead = 0, 0
+
+	for totalBytesRead < 2 && err == nil {
+		bytesRead, err = io.ReadFull(state.conn, algoBuf[totalBytesRead:])
+		totalBytesRead += bytesRead
+	}
+
+	if err != nil {
+		return nil, errors.New("read compress algo information err"), "", 0, 0
+	}
+
+	compressInfo := binary.BigEndian.Uint16(algoBuf)
+	algo, compEnable := common.GetCompressInfo(compressInfo)
+
 	sizeBuf = make([]byte, 4)
 	bytesRead, totalBytesRead = 0, 0
 
@@ -73,6 +88,14 @@ func receiveQuicRawMessage(state *ConnState, sendTo string) ([]byte, error, stri
 		}
 		totalBytesRead += bytesRead
 	}
+	retBuf := append(algoBuf, append(sizeBuf, buffer...)...)
+	if compEnable {
+		buffer, err = common.Uncompress(buffer, common.AlgoType(algo))
+		if err != nil {
+			log.Error("uncompress buffer msg err, err:", err.Error(), ",algo type:", algo)
+			return nil, errors.Errorf("uncompress err:%s,algo:%d", err.Error(), algo), "", 0, 0
+		}
+	}
 	// Deserialize message.
 	msg := new(protobuf.Message)
 	err = proto.Unmarshal(buffer, msg)
@@ -80,7 +103,7 @@ func receiveQuicRawMessage(state *ConnState, sendTo string) ([]byte, error, stri
 		return nil, errors.New("failed to unmarshal message in receiveQuicRawMessage"), "", 0, 0
 	}
 	log.Info("in receiveQuicRawMessage recv a message will be transfered, sender from:", msg.Sender.Address, ",send to:", sendTo, ",msg.opcode:", msg.Opcode, ",msg.Nonce:", msg.GetMessageNonce(), ",networkID:", msg.NetID)
-	return append(sizeBuf, buffer...), nil, msg.Sender.Address, msg.Opcode, msg.GetMessageNonce()
+	return retBuf, nil, msg.Sender.Address, msg.Opcode, msg.GetMessageNonce()
 }
 
 func receiveMessage(state *ConnState) (*protobuf.Message, error) {
@@ -101,6 +124,21 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 		return nil, errors.Errorf("networkID is not match the quic message info which is contained in msg 4 bytes ahead when recv Raw Message,"+
 			" recv.NetID:%d, setting.NetID:%d", binary.BigEndian.Uint32(buffer), common.Parameters.NetworkID)
 	}
+
+	buffer = make([]byte, 2)
+	bytesRead, totalBytesRead = 0, 0
+
+	for totalBytesRead < 2 && err == nil {
+		bytesRead, err = state.conn.Read(buffer[totalBytesRead:])
+		totalBytesRead += bytesRead
+	}
+
+	if err != nil {
+		return nil, errors.Errorf("tcp receive invalid message size bytes err:%s", err.Error())
+	}
+
+	compressInfo := binary.BigEndian.Uint16(buffer)
+	algo, compEnable := common.GetCompressInfo(compressInfo)
 
 	buffer = make([]byte, 4)
 	bytesRead, totalBytesRead = 0, 0
@@ -131,6 +169,13 @@ func receiveMessage(state *ConnState) (*protobuf.Message, error) {
 		totalBytesRead += bytesRead
 	}
 
+	if compEnable {
+		buffer, err = common.Uncompress(buffer, common.AlgoType(algo))
+		if err != nil {
+			log.Error("uncompress buffer msg err, err:", err.Error(), ",algo type:", algo)
+			return nil, errors.Errorf("uncompress err:%s,algo:%d", err.Error(), algo)
+		}
+	}
 	// Deserialize message.
 	msg := new(protobuf.Message)
 	err = proto.Unmarshal(buffer, msg)
@@ -173,10 +218,18 @@ func sendMessage(state *ConnState, message proto.Message) error {
 		log.Error("(quic)stack info:", fmt.Sprintf("%s", debug.Stack()))
 		return errors.New("quic sendMessage,len(message) is empty")
 	}
+
+	var enable uint16
+	if common.Parameters.Compression.Enable {
+		enable = 1
+	} else {
+		enable = 0
+	}
 	// Serialize size.
-	buffer := make([]byte, 8)
+	buffer := make([]byte, 10)
 	binary.BigEndian.PutUint32(buffer, common.Parameters.NetworkID)
-	binary.BigEndian.PutUint32(buffer[4:], uint32(len(bytes)))
+	binary.BigEndian.PutUint16(buffer[4:], uint16(enable<<8)|(uint16(common.Parameters.Compression.CompressAlgo)&0xFF))
+	binary.BigEndian.PutUint32(buffer[6:], uint32(len(bytes)))
 
 	buffer = append(buffer, bytes...)
 
@@ -193,6 +246,12 @@ func sendMessage(state *ConnState, message proto.Message) error {
 			return err
 		}
 		totalBytesWritten += bytesWritten
+		if state.writer.Available() <= 0 {
+			if err = state.writer.Flush(); err != nil {
+				log.Errorf("quic stream flush immediately err:%s", err.Error())
+				return err
+			}
+		}
 	}
 
 	if err != nil {
@@ -238,7 +297,7 @@ func transferQuicRawMessage(message []byte, state *ConnState) error {
 	}
 
 	if err != nil {
-		return errors.Wrap(err, "quic stream: failed to write to socket")
+		return errors.Errorf("quic stream: failed to write to socket, err:%s", err.Error())
 	}
 
 	if err := state.writer.Flush(); err != nil {
