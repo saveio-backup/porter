@@ -107,7 +107,7 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 				log.Info("tcp goroutine exit receive stop signal: peerInfo.state.stop, listen ip is: ", peerInfo.addr)
 				return
 			default:
-				buffer, err, sendFrom, opcode, nonce := receiveTcpRawMessage(connState, peerInfo.addr)
+				buffer, err := receiveTcpRawMessage(connState, peerInfo.addr)
 				if 0 == len(buffer) || nil == buffer {
 					log.Error("(tcp) onceAccept groutine, receive empty message. proxy listen server/ip:", peerInfo.addr,
 						"remote client addr:", conn.RemoteAddr().String())
@@ -124,8 +124,7 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 						"remote client addr:", conn.RemoteAddr().String())
 					return
 				} else {
-					log.Info("transfer tcp raw message success, sender from:", sendFrom, ",send to:", peerInfo.addr,
-						",msg.opcode:", opcode, ",msg.Nonce:", nonce, "msg.len:", len(buffer))
+					log.Info("transfer tcp raw message success, send to:", peerInfo.addr, "msg.len:", len(buffer))
 				}
 			}
 		}

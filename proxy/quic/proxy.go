@@ -91,7 +91,7 @@ func (p *QuicProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 				log.Info("quic goroutine exit receive stop signal: peerInfo.state.stop, listen ip is: ", peerInfo.addr)
 				return
 			default:
-				buffer, err, sendFrom, opcode, nonce := receiveQuicRawMessage(connState, peerInfo.addr)
+				buffer, err := receiveQuicRawMessage(connState, peerInfo.addr)
 				if 0 == len(buffer) || nil == buffer {
 					log.Error("(quic) onceAccept groutine, receive empty message. proxy listen server/ip:", peerInfo.addr,
 						"remote client addr:", conn.RemoteAddr().String())
@@ -108,8 +108,7 @@ func (p *QuicProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 						"remote client addr:", conn.RemoteAddr().String())
 					return
 				} else {
-					log.Info("transfer quic raw message success, sender from:", sendFrom, ",send to:", peerInfo.addr,
-						",msg.opcode:", opcode, ",msg.Nonce:", nonce, "msg.len:", len(buffer))
+					log.Info("transfer quic raw message success, send to:", peerInfo.addr, "msg.len:", len(buffer))
 				}
 			}
 		}

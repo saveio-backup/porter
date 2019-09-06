@@ -22,7 +22,7 @@ import (
 
 const defaultRecvBufferSize = 1024 * 1024 * 4
 
-func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, string, uint32, uint64) {
+func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 	var err error
 	var size uint32
 	// Read until all header bytes have been read.
@@ -33,13 +33,13 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, strin
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
 			log.Error("tcp receive raw message head err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
-			return nil, err, "", 0, 0
+			return nil, err
 		}
 		totalBytesRead += bytesRead
 	}
 
 	if binary.BigEndian.Uint32(sizeBuf) != common.Parameters.NetworkID {
-		return nil, errors.New("networkID is not match the message info which is contained in msg 4 bytes ahead when recv Raw Message"), "", 0, 0
+		return nil, errors.New("networkID is not match the message info which is contained in msg 4 bytes ahead when recv Raw Message")
 	}
 
 	algoBuf := make([]byte, 2)
@@ -51,7 +51,7 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, strin
 	}
 
 	if err != nil {
-		return nil, errors.New("read compress algo information err"), "", 0, 0
+		return nil, errors.New("read compress algo information err")
 	}
 
 	compressInfo := binary.BigEndian.Uint16(algoBuf)
@@ -64,14 +64,14 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, strin
 		bytesRead, err = io.ReadFull(state.conn, sizeBuf[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
 			log.Error("tcp receive raw message head err:", err.Error(), "has read buffer message:", sizeBuf, "buffer.len:", bytesRead)
-			return nil, err, "", 0, 0
+			return nil, err
 		}
 		totalBytesRead += bytesRead
 	}
 
 	size = binary.BigEndian.Uint32(sizeBuf)
 	if size == 0 {
-		return nil, errors.New("message body size is zero in head expression when recvTcpRawMsg"), "", 0, 0
+		return nil, errors.New("message body size is zero in head expression when recvTcpRawMsg")
 	}
 	buffer := make([]byte, size)
 
@@ -81,17 +81,25 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, strin
 		bytesRead, err = io.ReadFull(state.conn, buffer[totalBytesRead:])
 		if err != nil || bytesRead == 0 {
 			log.Error("tcp receive raw message body err:", err.Error(), "has read buffer message:", buffer[:totalBytesRead+bytesRead], "buffer.len:", bytesRead, "total message body size:", size)
-			return nil, err, "", 0, 0
+			return nil, err
 		}
 		totalBytesRead += bytesRead
 	}
 
 	retBuf := append(algoBuf, append(sizeBuf, buffer...)...)
+
+	genDebugInfo(buffer, retBuf, compEnable, algo, sendTo)
+
+	return retBuf, nil
+}
+
+func genDebugInfo(buffer, retBuf []byte, compEnable bool, algo common.AlgoType, sendTo string) {
+	var err error
 	if compEnable {
-		buffer, err = common.Uncompress(buffer, common.AlgoType(algo))
+		buffer, err = common.Uncompress(buffer, algo)
 		if err != nil {
 			log.Error("uncompress buffer msg err, err:", err.Error(), ",algo type:", algo)
-			return nil, errors.Errorf("uncompress err:%s,algo:%d", err.Error(), algo), "", 0, 0
+			return
 		}
 	}
 
@@ -99,10 +107,12 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error, strin
 	msg := new(protobuf.Message)
 	err = proto.Unmarshal(buffer, msg)
 	if err != nil {
-		return nil, errors.New("failed to unmarshal message in receiveTcpRawMessage"), "", 0, 0
+		log.Errorf("failed to unmarshal message in receiveTcpRawMessage")
+		return
 	}
-	log.Info("in receiveTcpRawMessage recv a message will be transfered, sender from:", msg.Sender.Address, ",send to:", sendTo, ",msg.opcode:", msg.Opcode, ",msg.Nonce:", msg.GetMessageNonce(), ",networkID:", msg.NetID)
-	return retBuf, nil, msg.Sender.Address, msg.Opcode, msg.GetMessageNonce()
+	log.Info("in receiveTcpRawMessage recv a message will be transfered, sender from:", msg.Sender.Address, ",send to:", sendTo,
+		",msg.opcode:", msg.Opcode, ",msg.Nonce:", msg.GetMessageNonce(), ",networkID:", msg.NetID, ",msg.Len:", len(retBuf),
+		",compress algo:", algo, ",compress enable:", compEnable)
 }
 
 func receiveMessage(state *ConnState) (*protobuf.Message, error) {
