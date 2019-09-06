@@ -88,7 +88,7 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 
 	retBuf := append(algoBuf, append(sizeBuf, buffer...)...)
 
-	genDebugInfo(buffer, retBuf, compEnable, algo, sendTo)
+	go genDebugInfo(buffer, retBuf, compEnable, algo, sendTo)
 
 	return retBuf, nil
 }
