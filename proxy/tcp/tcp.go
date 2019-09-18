@@ -92,7 +92,7 @@ func Init() *TCPProxyServer {
 func newConnState(listenr net.Conn, addr string) *ConnState {
 	return &ConnState{
 		conn:         listenr,
-		writer:       bufio.NewWriterSize(listenr, defaultRecvBufferSize),
+		writer:       bufio.NewWriterSize(listenr, common.Parameters.WriteBufferSize),
 		messageNonce: 0,
 		writerMutex:  new(sync.Mutex),
 		stop:         make(chan struct{}),

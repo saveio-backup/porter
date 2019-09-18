@@ -11,6 +11,7 @@
     "TPort":6008,
     "PortTimeout":180,
     "NetworkID":1564141146,
+    "WriteBufferSize":8388608,
     "LogDir":"./",
     "LogLevel":1,
     "PorterDBPath":"./porterdb",

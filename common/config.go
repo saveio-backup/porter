@@ -38,6 +38,7 @@ type Configuration struct {
 	TPort           int           `json:"TPort"`
 	PortTimeout     time.Duration `json:"PortTimeout"`
 	NetworkID       uint32        `json:"NetworkID"`
+	WriteBufferSize int           `json:"WriteBufferSize"`
 	LogDir          string        `json:"LogDir"`
 	LogLevel        int           `json:"LogLevel"`
 	PorterDBPath    string        `json:"PorterDBPath"`

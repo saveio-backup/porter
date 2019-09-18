@@ -20,8 +20,6 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
-const defaultRecvBufferSize = 1024 * 1024 * 4
-
 func receiveQuicRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 	var err error
 	var size uint32
