@@ -151,7 +151,7 @@ func (p *TCPProxyServer) serverAccept() error {
 				}
 				log.Info("receive a new message which need to be controll message type in main Accept, message.opcode:",
 					message.Opcode, "netID:", message.NetID, "sender address:", message.Sender.Address)
-				if message.Opcode == uint32(opcode.ProxyRequestCode) || message.Opcode == uint32(opcode.KeepaliveCode) {
+				if message.Opcode == uint32(opcode.ProxyRequestCode) || message.Opcode == uint32(opcode.KeepaliveCode) || message.Opcode == uint32(opcode.MetricRequestCode) {
 					p.msgBuffer <- msgNotify{message: message, state: connState}
 					firstInboundMsg = false
 				}

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/saveio/porter/common"
 	"github.com/saveio/porter/internal/protobuf"
 	"github.com/saveio/porter/types/opcode"
@@ -100,6 +101,27 @@ func (p *TCPProxyServer) handleProxyKeepaliveMessage(message *protobuf.Message, 
 	}
 }
 
+func (p *TCPProxyServer) handleMetricRequestMessage(message *protobuf.Message, state *ConnState) {
+	ConnectionID := hex.EncodeToString(message.Sender.ConnectionId)
+	if _, ok := p.proxies.Load(ConnectionID); ok {
+		msg := new(protobuf.MetricRequest)
+		err := proto.Unmarshal(message.Message, msg)
+		if err != nil {
+			return
+		}
+		if err := replySyncMessage(state, &protobuf.MetricResponse{SendTimestamp: msg.SendTimestamp, RawData: msg.RawData}, message.RequestNonce); err != nil {
+			log.Error("tcp handleMetricRequestMessage err:", err.Error())
+		}
+	}
+
+	common.PortSet.WriteMutex.Lock()
+	defer common.PortSet.WriteMutex.Unlock()
+	key := fmt.Sprintf("tcp-%s", ConnectionID)
+	if port, ok := common.PortSet.Cache.Load(key); ok {
+		port.(*common.UsingPort).Timestamp = time.Now()
+	}
+}
+
 func (p *TCPProxyServer) handleControlMessage() {
 	for {
 		select {
@@ -109,6 +131,8 @@ func (p *TCPProxyServer) handleControlMessage() {
 				p.handleProxyRequestMessage(item.message, item.state)
 			case uint32(opcode.KeepaliveCode):
 				p.handleProxyKeepaliveMessage(item.message, item.state)
+			case uint32(opcode.MetricRequestCode):
+				p.handleMetricRequestMessage(item.message, item.state)
 			default:
 				//log.Warn("please send correct control message type, include ProxyRequest/Keepalive/Disconnect, message.opcode:", item.message.Opcode, "send to ip:",item.message.Sender.Address)
 			}

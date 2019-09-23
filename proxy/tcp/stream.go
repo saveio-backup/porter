@@ -217,6 +217,66 @@ func prepareMessage(message proto.Message, state *ConnState) *protobuf.Message {
 	}
 }
 
+func replySyncMessage(state *ConnState, message proto.Message, nonce uint64) error {
+	preMessage := prepareMessage(message, state)
+	preMessage.ReplyFlag = true
+	preMessage.RequestNonce = nonce
+	bytes, err := proto.Marshal(preMessage)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal message in TCP sendMessage")
+	}
+	if len(bytes) == 0 {
+		log.Error("stack info:", fmt.Sprintf("%s", debug.Stack()))
+		return errors.New("tcp sendMessage,len(message) is empty")
+	}
+
+	var enable uint16
+	if common.Parameters.Compression.Enable {
+		enable = 1
+	} else {
+		enable = 0
+	}
+	// Serialize size.
+	buffer := make([]byte, 10)
+	binary.BigEndian.PutUint32(buffer, common.Parameters.NetworkID)
+	binary.BigEndian.PutUint16(buffer[4:], uint16(enable<<8)|(uint16(common.Parameters.Compression.CompressAlgo)&0xFF))
+	binary.BigEndian.PutUint32(buffer[6:], uint32(len(bytes)))
+
+	buffer = append(buffer, bytes...)
+
+	// Write until all bytes have been written.
+	bytesWritten, totalBytesWritten := 0, 0
+
+	state.writerMutex.Lock()
+	defer state.writerMutex.Unlock()
+
+	for totalBytesWritten < len(buffer) && err == nil {
+		bytesWritten, err = state.writer.Write(buffer[totalBytesWritten:])
+		if err != nil {
+			log.Errorf("tcp stream(common): failed to write entire buffer, err: %+v", err)
+			return err
+		}
+		totalBytesWritten += bytesWritten
+		if state.writer.Available() <= 0 {
+			if err = state.writer.Flush(); err != nil {
+				log.Errorf("tcp stream flush buffer immediately err:", err.Error())
+				return err
+			}
+		}
+	}
+
+	if err != nil {
+		return errors.Wrap(err, "tcp stream: failed to write to socket")
+	}
+
+	if err := state.writer.Flush(); err != nil {
+		log.Errorf("tcp stream(common): failed to flush buffer, err: %+v", err)
+		return err
+	}
+
+	return nil
+}
+
 func sendMessage(state *ConnState, message proto.Message) error {
 	bytes, err := proto.Marshal(prepareMessage(message, state))
 	if err != nil {

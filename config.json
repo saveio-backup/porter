@@ -15,6 +15,6 @@
     "LogDir":"./",
     "LogLevel":1,
     "PorterDBPath":"./porterdb",
-    "Compression":{"Enable":true,"CompressAlgo":1,"FileSize":4194304}
+    "Compression":{"Enable":false,"CompressAlgo":1,"FileSize":4194304}
   }
 }
