@@ -12,6 +12,8 @@ import (
 	"runtime/debug"
 	"sync/atomic"
 
+	"time"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/pkg/errors"
 	"github.com/saveio/porter/common"
@@ -20,7 +22,7 @@ import (
 	"github.com/saveio/themis/common/log"
 )
 
-func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
+func (p *TCPProxyServer) receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 	var err error
 	var size uint32
 	// Read until all header bytes have been read.
@@ -35,7 +37,7 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 		}
 		totalBytesRead += bytesRead
 	}
-
+	start := time.Now()
 	if binary.BigEndian.Uint32(sizeBuf) != common.Parameters.NetworkID {
 		return nil, errors.New("networkID is not match the message info which is contained in msg 4 bytes ahead when recv Raw Message")
 	}
@@ -83,7 +85,7 @@ func receiveTcpRawMessage(state *ConnState, sendTo string) ([]byte, error) {
 		}
 		totalBytesRead += bytesRead
 	}
-
+	p.Metric.RecvRawTimeGauge.Update(int64(time.Since(start)))
 	retBuf := append(algoBuf, append(sizeBuf, buffer...)...)
 
 	go genDebugInfo(buffer, retBuf, compEnable, algo, sendTo)

@@ -59,6 +59,9 @@ func (p *TCPProxyServer) releasePeerResource(ConnectionID string) {
 			peerInfo.(peer).conn.Close()
 			peerInfo.(peer).listener.Close()
 			peerInfo.(peer).state.conn.Close()
+
+			p.Metric.ProxyCounter.Dec(1)
+			p.Metric.MainConnCounter.Dec(1)
 		})
 	}
 }

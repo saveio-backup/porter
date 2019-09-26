@@ -15,6 +15,7 @@
     "LogDir":"./",
     "LogLevel":1,
     "PorterDBPath":"./porterdb",
-    "Compression":{"Enable":false,"CompressAlgo":1,"FileSize":4194304}
+    "Compression":{"Enable":false,"CompressAlgo":1,"FileSize":4194304},
+    "InfluxDB":{"URL":"http://192.168.1.115:8086","DBName":"metric","UserName":"saveio","Password":"onchain@beijing","Interval":3}
   }
 }

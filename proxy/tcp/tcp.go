@@ -64,6 +64,7 @@ type TCPProxyServer struct {
 	msgBuffer      chan msgNotify
 	listenerBuffer chan peerListen
 	stop           chan struct{}
+	Metric         common.PorterMetric
 }
 
 type ConnState struct {
@@ -86,6 +87,7 @@ func Init() *TCPProxyServer {
 		msgBuffer:      make(chan msgNotify, MESSAGE_CHANNEL_LEN),
 		listenerBuffer: make(chan peerListen, LISTEN_CHANNEL_LEN),
 		stop:           make(chan struct{}),
+		Metric:         common.InitMetrics(),
 	}
 }
 
@@ -133,6 +135,7 @@ func (p *TCPProxyServer) serverAccept() error {
 			log.Warn("tcp listener accept error:", err.Error(), "listen addr:", p.mainListener.Addr().String())
 			continue
 		}
+		p.Metric.MainConnCounter.Inc(1)
 		go func(conn net.Conn) {
 			log.Info("start a new goroutine for new Inbound connection in main proxy server accept, remote addr:", conn.RemoteAddr().String())
 			connState := newConnState(conn, conn.RemoteAddr().String())
@@ -143,6 +146,7 @@ func (p *TCPProxyServer) serverAccept() error {
 					log.Warn("tcp receive message goroutine err:", err.Error(), "listen remote addr:", conn.RemoteAddr().String())
 					if firstInboundMsg == true || connState.connectionID == "" {
 						log.Error("first inbound message is error, connection will be closed immediately.")
+						p.Metric.MainConnCounter.Dec(1)
 						conn.Close()
 						break
 					}

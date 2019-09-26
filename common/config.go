@@ -26,6 +26,14 @@ type Compression struct {
 	FileSize     int      `json:"FileSize"`
 }
 
+type InfluxDB struct {
+	URL      string `json:"URL"`
+	DBName   string `json:"DBName"`
+	UserName string `json:"UserName"`
+	Password string `json:"Password"`
+	Interval int    `json:"Interval"`
+}
+
 type Configuration struct {
 	InterfaceName   string        `json:"InterfaceName"`
 	InnerIP         string        `json:"InnerIP"`
@@ -43,6 +51,7 @@ type Configuration struct {
 	LogLevel        int           `json:"LogLevel"`
 	PorterDBPath    string        `json:"PorterDBPath"`
 	Compression     Compression   `json:"Compression"`
+	InfluxDB        InfluxDB      `json:"InfluxDB"`
 }
 
 type ConfigFile struct {
