@@ -134,6 +134,7 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 					log.Info("transfer tcp raw message success, send to:", peerInfo.addr, "msg.len:", len(buffer))
 					p.Metric.TransferAmountGauge.Update(int64(len(buffer)))
 					p.Metric.SendRawTimeGauge.Update(int64(time.Since(start)))
+					peerInfo.updateTime = time.Now()
 				}
 			}
 		}
