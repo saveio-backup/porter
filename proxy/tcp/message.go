@@ -60,8 +60,8 @@ func (p *TCPProxyServer) releasePeerResource(ConnectionID string) {
 			peerInfo.(peer).listener.Close()
 			peerInfo.(peer).state.conn.Close()
 
-			p.Metric.ProxyCounter.Dec(1)
-			p.Metric.MainConnCounter.Dec(1)
+			//p.Metric.ProxyCounter.Dec(1)
+			//p.Metric.MainConnCounter.Dec(1)
 		})
 	}
 }
@@ -135,7 +135,7 @@ func (p *TCPProxyServer) handleControlMessage() {
 			case uint32(opcode.KeepaliveCode):
 				p.handleProxyKeepaliveMessage(item.message, item.state)
 			case uint32(opcode.MetricRequestCode):
-				p.handleMetricRequestMessage(item.message, item.state)
+				//p.handleMetricRequestMessage(item.message, item.state)
 			default:
 				//log.Warn("please send correct control message type, include ProxyRequest/Keepalive/Disconnect, message.opcode:", item.message.Opcode, "send to ip:",item.message.Sender.Address)
 			}

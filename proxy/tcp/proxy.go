@@ -25,7 +25,7 @@ func (p *TCPProxyServer) startListenScheduler() {
 			if value, ok := p.proxies.Load(item.connectionID); ok {
 				log.Info(fmt.Sprintf("(tcp) origin (%s) relay ip is: %s, has exist, don't delete relevant resource immediately but cover old value except for listen conn.", item.connectionID, value.(peer).addr))
 				value.(peer).listener.Close()
-				p.Metric.ProxyCounter.Dec(1)
+				//p.Metric.ProxyCounter.Dec(1)
 				//close(value.(peer).stop)
 			}
 
@@ -66,7 +66,7 @@ func (p *TCPProxyServer) proxyListenAndAccept(connectionID string, state *ConnSt
 	p.proxies.Store(connectionID, peerInfo)
 
 	go p.proxyAccept(peerInfo, connectionID)
-	p.Metric.ProxyCounter.Inc(1)
+	//p.Metric.ProxyCounter.Inc(1)
 	return fmt.Sprintf("%s:%d", common.GetPublicIP(), port)
 }
 
@@ -93,13 +93,13 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 		log.Error("peer proxy accept err:", err.Error(), ",listen ip:", peerInfo.listener.Addr().String())
 		return err
 	} else {
-		p.Metric.ProxyConnCounter.Inc(1)
+		//p.Metric.ProxyConnCounter.Inc(1)
 		log.Info("accept a new inbound connection to proxy server:", peerInfo.addr, "remote client addr:", conn.RemoteAddr().String())
 	}
 	go func(conn net.Conn) {
 		defer func() {
 			conn.Close()
-			p.Metric.ProxyConnCounter.Dec(1)
+			//p.Metric.ProxyConnCounter.Dec(1)
 		}()
 		//defer p.releasePeerResource(connectionID) //不要releasePeerResource， 只释放掉出问题的连接即可，不要释放无关连接；
 		connState := newConnState(conn, "")
@@ -124,7 +124,7 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 						peerInfo.addr, "remote client addr:", conn.RemoteAddr().String())
 					return
 				}
-				start := time.Now()
+				//start := time.Now()
 				err = transferTcpRawMessage(buffer, peerInfo.state)
 				if err != nil {
 					log.Error("transfer tcp raw message err:", err.Error(), "proxy listen server/ip addr:", peerInfo.addr,
@@ -132,8 +132,8 @@ func (p *TCPProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 					return
 				} else {
 					log.Info("transfer tcp raw message success, send to:", peerInfo.addr, "msg.len:", len(buffer))
-					p.Metric.TransferAmountGauge.Update(int64(len(buffer)))
-					p.Metric.SendRawTimeGauge.Update(int64(time.Since(start)))
+					//p.Metric.TransferAmountGauge.Update(int64(len(buffer)))
+					//p.Metric.SendRawTimeGauge.Update(int64(time.Since(start)))
 					peerInfo.updateTime = time.Now()
 				}
 			}

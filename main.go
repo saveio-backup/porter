@@ -24,7 +24,7 @@ func main() {
 	go common.CheckLogFileSize()
 
 	log.Debug("porter version:", common.Version)
-
+	common.StartMonitor()
 	switch *protocol {
 	case "udp":
 		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
