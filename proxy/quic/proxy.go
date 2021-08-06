@@ -78,7 +78,7 @@ func (p *QuicProxyServer) onceAccept(peerInfo peer, connectionID string) error {
 	stream, err := conn.AcceptStream(context.Background())
 	go func(stream quic.Stream, conn quic.Session) {
 		defer stream.Close()
-		defer conn.Close()
+		defer conn.CloseWithError(0, "")
 		//defer p.releasePeerResource(connectionID) //不要releasePeerResource， 只释放掉出问题的连接即可，不要释放无关连接；
 		connState := newConnState(stream, "", conn)
 		close(connState.stop) //connState.stop没有使用，可以立刻关闭;

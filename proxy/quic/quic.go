@@ -133,7 +133,7 @@ func generateTLSConfig() *tls.Config {
 // Listen listens for incoming quic connections on a specified port.
 func listen(ip string, port uint16) (quic.Listener, error) {
 	resolved := fmt.Sprintf("%s:%d", ip, port)
-	listener, err := quic.ListenAddr(resolved, generateTLSConfig(), &quic.Config{KeepAlive: true, IdleTimeout: time.Second * 15})
+	listener, err := quic.ListenAddr(resolved, generateTLSConfig(), &quic.Config{KeepAlive: true, MaxIdleTimeout: time.Second * 15})
 
 	if err != nil {
 		log.Error("quic listen start err:", err.Error())
@@ -167,7 +167,7 @@ func (p *QuicProxyServer) serverAccept() error {
 		stream, err := conn.AcceptStream(context.Background())
 		if err != nil {
 			log.Error("quic accept stream err:", err.Error(), "listen addr:", p.mainListener.Addr().String())
-			conn.Close()
+			conn.CloseWithError(0, "")
 			continue
 		}
 		go func(stream quic.Stream, conn quic.Session) {
@@ -179,7 +179,7 @@ func (p *QuicProxyServer) serverAccept() error {
 					log.Warn("quic receive message goroutine err:", err.Error(), "listen remote addr:", conn.RemoteAddr().String())
 					if firstInboundMsg == true || connState.connectionID == "" {
 						log.Error("first inbound quic message is error, connection will be closed immediately.")
-						conn.Close()
+						conn.CloseWithError(0, "")
 						break
 					}
 					p.releasePeerResource(connState.connectionID)

@@ -57,7 +57,7 @@ func (p *QuicProxyServer) releasePeerResource(ConnectionID string) {
 			peerInfo.(peer).listener.Close()
 			peerInfo.(peer).conn.Close()
 			peerInfo.(peer).state.conn.Close()
-			peerInfo.(peer).state.session.Close()
+			peerInfo.(peer).state.session.CloseWithError(0, "close")
 			p.proxies.Delete(ConnectionID)
 		})
 	}

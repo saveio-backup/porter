@@ -2,7 +2,15 @@
 
 GOFMT=gofmt
 GC=go build
-VERSION := $(shell git describe --abbrev=4 --dirty --always --tags)
+LAST_VERSION := $(shell git describe --match "v*" --always --tags)
+VERSION_PARTS      := $(subst ., ,$(LAST_VERSION))
+MAJOR              := $(word 1,$(VERSION_PARTS))
+MINOR              := $(word 2,$(VERSION_PARTS))
+MICRO              := $(word 3,$(VERSION_PARTS))
+MICRO_PARTS := $(subst -, ,$(MICRO))
+MICRO_FIRST :=  $(word 1,$(MICRO_PARTS))
+NEXT_MICRO         := $(shell echo $$(($(MICRO_FIRST)+1)))
+VERSION := $(MAJOR).$(MINOR).$(NEXT_MICRO)
 Minversion := $(shell date)
 IDENTIFIER= $(GOOS)-$(GOARCH)
 BUILD_PORTER_PAR = -ldflags "-X github.com/saveio/porter/common.Version=$(VERSION)" #-race
