@@ -35,10 +35,10 @@ func main() {
 	case "tcp":
 		tcpProxy.Init().StartTCPServer(uint16(common.GetPortFromParamsByProtocol("tcp")))
 	default:
-		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
-		kcpProxy.Init().StartKCPServer(uint16(common.GetPortFromParamsByProtocol("kcp")))
-		quicProxy.Init().StartQuicServer(uint16(common.GetPortFromParamsByProtocol("quic")))
-		tcpProxy.Init().StartTCPServer(uint16(common.GetPortFromParamsByProtocol("tcp")))
+		go udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
+		go kcpProxy.Init().StartKCPServer(uint16(common.GetPortFromParamsByProtocol("kcp")))
+		go quicProxy.Init().StartQuicServer(uint16(common.GetPortFromParamsByProtocol("quic")))
+		go tcpProxy.Init().StartTCPServer(uint16(common.GetPortFromParamsByProtocol("tcp")))
 	}
 	select {}
 }
