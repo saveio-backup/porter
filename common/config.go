@@ -40,6 +40,7 @@ type Configuration struct {
 	PublicIP        string        `json:"PublicIP"`
 	RandomPortBegin int           `json:"RandomPortBegin"`
 	RandomPortRange int           `json:"RandomPortRange"`
+	Protocol        string		  `json:"Protocol"`
 	UPort           int           `json:"UPort"`
 	KPort           int           `json:"KPort"`
 	QPort           int           `json:"QPort"`

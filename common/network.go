@@ -84,3 +84,7 @@ func GetPublicHost(protocol string) string {
 func GetLogDir() string {
 	return Parameters.LogDir
 }
+
+func GetProtocol() string {
+	return Parameters.Protocol
+}

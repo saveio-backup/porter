@@ -17,7 +17,6 @@ import (
 )
 
 func main() {
-	protocol := flag.String("protocol", "", "protocol to use (kcp/tcp/udp)")
 	flag.Parse()
 
 	log.InitLog(common.Parameters.LogLevel, common.GetLogDir(), log.Stdout)
@@ -25,7 +24,7 @@ func main() {
 
 	log.Debug("porter version:", common.Version)
 	common.StartMonitor()
-	switch *protocol {
+	switch common.GetProtocol() {
 	case "udp":
 		udpProxy.Init().StartUDPServer(uint16(common.GetPortFromParamsByProtocol("udp")))
 	case "kcp":
